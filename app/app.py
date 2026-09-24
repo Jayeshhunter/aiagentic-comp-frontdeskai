@@ -27,6 +27,7 @@ from observability import (
     get_tracer,
     get_langfuse_handler,
     langfuse_metadata,
+    langfuse_tags,
     flush_langfuse,
 )
 
@@ -308,6 +309,7 @@ async def send_message(request: Request, message: str = Form(...)):
                     if lf_handler:
                         config["callbacks"] = [lf_handler]
                         config["metadata"] = langfuse_metadata(user_id=user, session_id=user)
+                        config["tags"] = langfuse_tags()
 
                     initial_state = {
                         "employee_name": employee_name,

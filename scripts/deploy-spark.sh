@@ -72,9 +72,9 @@ kubectl -n "${NAMESPACE}" create secret generic frontdeskai-secret \
 # so this normally needs nothing. A value in this repo's own .env (gitignored)
 # wins over the environment, for anyone pointing at a different project.
 #
-# In the workshop the sandbox Langfuse project is shared by the cohort, and the
-# pinned langfuse 2.x SDK ignores LANGFUSE_TRACING_ENVIRONMENT, so traces are
-# told apart by user id, not by namespace.
+# In the workshop the sandbox Langfuse project is shared by the cohort. The
+# pinned langfuse 2.x SDK ignores LANGFUSE_TRACING_ENVIRONMENT, so the app puts
+# that value (the namespace) on every trace as a tag instead.
 #
 # The file is READ, never sourced: it is hand-written and a stray line in it should
 # not execute during a deploy.

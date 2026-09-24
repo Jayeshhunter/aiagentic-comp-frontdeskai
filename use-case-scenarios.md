@@ -662,7 +662,7 @@ kubectl logs deployment/frontdeskai | grep -i langfuse
 
 Open `$LANGFUSE_HOST` (in the workshop, `https://jp.cloud.langfuse.com`) — mind the region, each one
 is a separate installation with its own UI. The workshop project is shared by the cohort, so filter by
-**User ID** = the email you logged in as, and open your newest `LangGraph` trace. Grafana shows you *that* a node
+the **tag** that is your namespace (e.g. `agenticaiu5`), and open your newest `LangGraph` trace. Grafana shows you *that* a node
 was slow; Langfuse shows you *what the model was actually asked*:
 
 - The retrieved policy chunks from Part 2, verbatim, inside the worker's prompt — proof the RAG context

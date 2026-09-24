@@ -154,9 +154,10 @@ Your sandbox terminal already exports `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KE
 the Deployment loads with `envFrom` (`optional: true`, so the app still starts without it). A value in the
 repo's `.env` wins over the environment, if you want to point at your own project instead.
 
-⚠️ **The workshop project is shared by the whole cohort**, and FrontDesk traces do not yet carry your
-namespace (their environment shows as `default`). To find your own, filter the Traces view by **User ID**
-(the email you logged in as) and by time.
+⚠️ **The workshop project is shared by the whole cohort.** Every FrontDesk trace is **tagged with your
+namespace** (for example `agenticaiu5`), so filter the Traces view by that tag. The environment column
+reads `default` for everyone: the pinned langfuse 2.x SDK ignores `LANGFUSE_TRACING_ENVIRONMENT`, so the
+app copies that value into a tag instead (`langfuse_tags()` in `app/observability.py`).
 
 ### On kind (Codespace / local — not part of the workshop)
 
@@ -547,7 +548,8 @@ Work down this list — the first two causes account for most cases:
 3. Verify the app logs show `"Langfuse enabled"` **and** `"auth_check": true` (see above).
 4. Send a chat request — health checks make no LLM calls, so they produce no traces.
 5. Langfuse batches and then queues server-side; a trace can take up to a minute to appear.
-6. In the workshop project, other participants' traces are there too — filter by your User ID.
+6. In the workshop project, other participants' traces are there too — filter by the tag that is your
+   namespace. Traces sent before that tag was added have none.
 7. Confirm from outside the UI, using the same keys (in the sandbox terminal they are already set; on
    kind, run `set -a; . ./.env; set +a` first):
 

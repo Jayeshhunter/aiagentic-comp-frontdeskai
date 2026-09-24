@@ -352,6 +352,17 @@ def langfuse_metadata(user_id: str = "", session_id: str = "") -> dict:
     return {"langfuse_user_id": user_id, "langfuse_session_id": session_id}
 
 
+def langfuse_tags() -> list:
+    """RunnableConfig tags that tell one deployment's traces apart in a shared project.
+
+    langfuse 2.x ignores LANGFUSE_TRACING_ENVIRONMENT, so every trace lands in
+    environment "default". deploy-spark.sh sets that variable to the namespace,
+    and a tag on the root run carries it onto the trace instead.
+    """
+    tag = os.environ.get("LANGFUSE_TRACING_ENVIRONMENT", "")
+    return [tag] if tag else []
+
+
 def flush_langfuse() -> None:
     """Send anything still queued — called on shutdown so a rollout doesn't drop traces."""
     if _lf_handler is None:
