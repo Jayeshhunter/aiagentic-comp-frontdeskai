@@ -4,26 +4,37 @@
 
 FrontDesk AI is a self-evolving agentic AI employee support desk built with FastAPI, LangGraph, and Ollama Cloud/Groq/OpenRouter LLMs. It routes employee chat requests through a supervisor agent to domain-specific workers (HR, Tech, Finance, Facilities, Analytics, Account, Skill Admin), with RAG-powered policy retrieval, tool-calling, QA checks, and escalation handling.
 
-**Primary LLM:** provider-selectable via `LLM_PROVIDER`. Default is Ollama Cloud (`api.ollama.com`) — `gemma4:cloud` via `ChatOllama` — with Groq (`llama-3.3-70b-versatile`) as the automatic fallback. On the Spark cluster it is `litellm`: an OpenAI-compatible gateway whose base URL and per-participant key are injected by the platform, so the app needs no vendor account. `_build_llm` in `agents.py` knows four providers — `ollama`, `groq`, `openrouter`, `litellm`.
+**Primary LLM:** every deploy path now uses `LLM_PROVIDER=litellm` — one OpenAI-compatible gateway set by `LITELLM_BASE_URL` / `LITELLM_API_KEY` (changed 2026-09-25; `.env.example` and the kind scripts no longer mention Ollama or Groq). The code's unset-env default is still Ollama Cloud (`api.ollama.com`) — `gemma4:cloud` via `ChatOllama` — with Groq (`llama-3.3-70b-versatile`) as the automatic fallback. On the Spark cluster it is `litellm`: an OpenAI-compatible gateway whose base URL and per-participant key are injected by the platform, so the app needs no vendor account. `_build_llm` in `agents.py` knows four providers — `ollama`, `groq`, `openrouter`, `litellm`.
 
 **What makes it agentic:** The system teaches itself new capabilities at runtime — admins describe a skill in plain English, and the system researches APIs, writes Python code, validates it, installs it to disk, configures it (API keys encrypted in DB), and executes it via domain workers. Everything persists across restarts with zero rebuild. Skills, config, LLM provider, and SMTP settings are all managed through conversation.
 
 ## Quick Start
 
-### One command (any environment)
+### Workshop — participant's own namespace (the default path since 2026-09-25)
 
 ```bash
-cp .env.example .env          # set OLLAMA_API_KEY and/or GROQ_API_KEY
+bash scripts/deploy-spark.sh    # JupyterLab terminal; APP_NAMESPACE, APP_HOST, LITELLM_*, LANGFUSE_* are already exported
+```
+
+The app is then live at `https://$APP_HOST` through the Ingress in the participant's namespace. Langfuse
+keys come from the terminal environment when `.env` leaves them empty (a `.env` value wins). Details in the
+Spark section below.
+
+### Codespace / kind (optional)
+
+```bash
+cp .env.example .env          # set LITELLM_BASE_URL and LITELLM_API_KEY
 bash scripts/quickstart.sh    # cluster if missing → app → MCP → health check → seed verification
 ```
 
-`quickstart.sh` is the supported participant path and is idempotent. It pulls `OLLAMA_API_KEY`,
-`GROQ_API_KEY` and `LANGFUSE_*` from the environment into `.env` (Codespaces secrets), fails early with
-instructions when no LLM key is set, and prints the demo logins when the app answers `/health`.
-`SKIP_MCP=true` skips the PostgreSQL/MCP stack.
+`quickstart.sh` is idempotent. It stops early when no gateway is set in `.env` or the environment.
+`deploy.sh` / `update-secret.sh` put `LLM_PROVIDER`, `LLM_MODEL`, `LITELLM_*` and an empty fallback into
+`frontdeskai-secret`, which the kind `deployment.yaml` loads with `envFrom`. An empty `.env` entry never
+blanks a value already in the environment. ⚠️ The workshop gateway is cluster-internal: a Codespace needs
+a gateway reachable from the internet. `SKIP_MCP=true` skips the PostgreSQL/MCP stack.
 
-In a Codespace, `.devcontainer/setup.sh` runs `quickstart.sh` automatically when a key is available from a
-Codespaces secret — clone, launch, done, with demo data already seeded.
+In a Codespace, `.devcontainer/setup.sh` copies `LITELLM_BASE_URL` / `LITELLM_API_KEY` / `LLM_MODEL` /
+`LANGFUSE_*` Codespaces secrets into `.env` and runs `quickstart.sh` when a gateway is set.
 
 ### Local (without Kubernetes)
 
@@ -33,24 +44,14 @@ python app/app.py
 # Open http://localhost:8000
 ```
 
-Requires `OLLAMA_API_KEY` (primary) and optionally `GROQ_API_KEY` (fallback) in `.env`.
-
-### GitHub Codespace / kind cluster
-
-Codespace: devcontainer auto-provisions the kind cluster via `.devcontainer/setup.sh`.
-
-```bash
-cp .env.example .env          # set OLLAMA_API_KEY + GROQ_API_KEY
-bash scripts/deploy.sh        # build + load into kind + deploy + rollout restart
-# Open http://localhost:8000  (NodePort 30800 — no port-forward needed)
-```
+Requires `LITELLM_BASE_URL` and `LITELLM_API_KEY` in `.env`.
 
 ### cloud-labs / localhost (kind)
 
 ```bash
 bash scripts/create-kind-cluster.sh   # one-time: creates kind cluster 'frontdeskai' + /shared/.sqlite
-cp .env.example .env                  # set OLLAMA_API_KEY + GROQ_API_KEY
-bash scripts/deploy.sh                # same command as Codespace — auto-detects kind context
+cp .env.example .env                  # set LITELLM_BASE_URL + LITELLM_API_KEY
+bash scripts/deploy.sh                # auto-detects kind context
 # Open http://localhost:8000  (NodePort 30800 — no port-forward needed)
 ```
 
@@ -166,7 +167,7 @@ bash scripts/deploy.sh
 # Update a secret/config without rebuilding the image
 kubectl patch secret frontdeskai-secret \
   --type=merge \
-  -p '{"stringData":{"GROQ_API_KEY":"<new-key>"}}'
+  -p '{"stringData":{"LITELLM_API_KEY":"<new-key>"}}'
 kubectl rollout restart deployment/frontdeskai
 
 # Check pod status and logs
@@ -259,19 +260,19 @@ get_leave_balance_from_hr_system  ──────→  FastMCP · streamable-h
 |------|-------------|
 | `scripts/quickstart.sh` | **Participant entry point** — validates/populates `.env`, creates the cluster if missing, deploys app + MCP, waits for `/health`, verifies seeded row counts, prints demo logins. Idempotent; `SKIP_MCP=true` to skip MCP |
 | `scripts/create-kind-cluster.sh` | One-time localhost/cloud-labs setup — creates kind cluster `frontdeskai` with NodePort mappings + `/shared/.sqlite`; equivalent of `.devcontainer/setup.sh` for non-Codespace hosts |
-| `scripts/deploy.sh` | One-command deploy — build + load/push + apply manifests + rollout restart, auto-detects kind vs production; preserves existing `SECRET_KEY` to avoid breaking encrypted DB values. Requires **at least one** of `OLLAMA_API_KEY` / `GROQ_API_KEY` (neither is individually mandatory) |
+| `scripts/deploy.sh` | One-command deploy — build + load/push + apply manifests + rollout restart, auto-detects kind vs production; preserves existing `SECRET_KEY` to avoid breaking encrypted DB values. Requires `LITELLM_BASE_URL` + `LITELLM_API_KEY` from `.env` or the environment |
 | `scripts/deploy-spark.sh` | **Spark cluster / participant namespace deploy.** Takes no arguments — `APP_NAMESPACE` and `APP_HOST` are already exported in a sandbox shell. Creates the ConfigMap, Service, Deployment, PVC, Ingress and `frontdeskai-secret`, preserving `SECRET_KEY` across redeploys (it is the Fernet key for encrypted skill config). `IMAGE=` overrides the image |
 | `scripts/manifests/spark/` | The Spark manifest set — **separate from the kind set on purpose**, because the participant namespace forbids NodePorts and caps memory |
 | `scripts/eval/hr_worker_eval.py` | Prompt-regression eval: does the HR worker call its tools, and does it still refuse for other people? Runs the real worker against the real model. See `scripts/eval/README.md` |
 | `scripts/deploy-mcp.sh` | Deploy MCP Leave Service — PostgreSQL + MCP server into `postgres` namespace + smoke test |
-| `scripts/update-secret.sh` | Update K8s secret from `.env` without rebuilding image (preserves SECRET_KEY, includes OLLAMA_API_KEY + GROQ_API_KEY + Langfuse) |
+| `scripts/update-secret.sh` | Update K8s secret from `.env` without rebuilding image (preserves SECRET_KEY; LiteLLM gateway + model + Langfuse) |
 | `scripts/install-observability.sh` | Install Prometheus, Grafana, Loki, Promtail, Tempo via Helm into `monitoring` namespace |
 | `scripts/update-observability.sh` | Update one component without a full reinstall — `grafana`, `dashboard`, `prometheus`, `loki`, `promtail`, `tempo`, or no arg for everything |
 | `scripts/generate-test-traffic.sh` | Generate load to populate observability dashboards |
 | `skills/oci_compute.py` | OCI compute self-service skill (git-tracked source; `kubectl cp` it to `/shared/.frontdeskai/skills/` to install) |
 | `scripts/manifests/deployment.yaml` | App deployment (image: `frontdeskai:latest`, imagePullPolicy: Never for kind) + `MCP_LEAVE_URL` env |
 | `scripts/manifests/service.yaml` | NodePort service — http(80→30800), metrics(9090→30900) |
-| `scripts/manifests/secret.yaml` | Secret template — `GROQ_API_KEY`, `SECRET_KEY`, `AUTH_PASSWORD`, `OLLAMA_API_KEY`, optional Langfuse keys |
+| `scripts/manifests/secret.yaml` | Secret template — `SECRET_KEY`, `AUTH_PASSWORD`, `LLM_PROVIDER`, `LLM_MODEL`, `LITELLM_*`, empty fallback, optional Langfuse keys |
 | `scripts/manifests/servicemonitor.yaml` | ServiceMonitor for Prometheus Operator |
 | `scripts/observability/tempo.yaml` | Tempo Helm values — OTLP gRPC (4317) + HTTP (4318) receivers |
 | `scripts/observability/loki.yaml` | Loki Helm values — SingleBinary, filesystem storage |
@@ -365,7 +366,7 @@ this one shipped looking like a broken integration.
 **Codespace** — devcontainer (`.devcontainer/`) provisions automatically:
 - Base image: `mcr.microsoft.com/devcontainers/python:3.13-bookworm` — Python minor kept in sync with `Containerfile` (`python:3.13-slim`); Bookworm required (Bullseye has an expired Yarn GPG key that breaks the Docker-in-Docker install)
 - Features: `docker-in-docker:2`, `kubectl-helm-minikube:1`
-- `postCreateCommand`: `.devcontainer/setup.sh` — seeds `.env`, copies `OLLAMA_API_KEY` / `GROQ_API_KEY` / `LANGFUSE_*` from Codespaces secrets into it, delegates to `scripts/create-kind-cluster.sh` (cluster + `/shared/.sqlite`), then runs `scripts/quickstart.sh` **if a key is present** so the codespace comes up with a deployed, seeded app. With no key it prints the two remaining steps instead. App deps are deliberately **not** pip-installed here; they live in the image built from `Containerfile`, so the app runs only in the kind cluster.
+- `postCreateCommand`: `.devcontainer/setup.sh` — seeds `.env`, copies `LITELLM_BASE_URL` / `LITELLM_API_KEY` / `LLM_MODEL` / `LANGFUSE_*` from Codespaces secrets into it, delegates to `scripts/create-kind-cluster.sh` (cluster + `/shared/.sqlite`), then runs `scripts/quickstart.sh` **if a gateway is set** so the codespace comes up with a deployed, seeded app. With no key it prints the two remaining steps instead. App deps are deliberately **not** pip-installed here; they live in the image built from `Containerfile`, so the app runs only in the kind cluster.
 - Participant-facing setup lives in `participant-instructions.md`; the guided demo tour lives in `use-case-scenarios.md`.
 
 **cloud-labs / localhost** — run once manually:

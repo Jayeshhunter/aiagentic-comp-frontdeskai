@@ -18,45 +18,33 @@ APP_URL="http://localhost:8000"
 
 step() { echo ""; echo "── $* ─────────────────────────────────────────────"; }
 
-# ── 1. .env with at least one LLM key ────────────────────────────────────────
+# ── 1. .env with the LLM gateway ─────────────────────────────────────────────
 step "Checking .env"
 if [ ! -f "${ENV_FILE}" ]; then
   cp "${REPO_DIR}/.env.example" "${ENV_FILE}"
   echo "Created .env from .env.example."
 fi
 
-# Read the two keys without sourcing the whole file
+# Read values without sourcing the whole file
 key_of() { grep -E "^$1=" "${ENV_FILE}" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'\''' | tr -d '\r'; }
-OLLAMA_KEY="$(key_of OLLAMA_API_KEY)"
-GROQ_KEY="$(key_of GROQ_API_KEY)"
+LLM_URL="$(key_of LITELLM_BASE_URL)"; LLM_URL="${LLM_URL:-${LITELLM_BASE_URL:-}}"
+LLM_KEY="$(key_of LITELLM_API_KEY)";  LLM_KEY="${LLM_KEY:-${LITELLM_API_KEY:-}}"
 
-# Codespaces/CI secrets win over an empty .env entry
-if [ -z "${OLLAMA_KEY}" ] && [ -n "${OLLAMA_API_KEY:-}" ]; then
-  sed -i "s|^OLLAMA_API_KEY=.*|OLLAMA_API_KEY=${OLLAMA_API_KEY}|" "${ENV_FILE}"
-  OLLAMA_KEY="${OLLAMA_API_KEY}"
-  echo "Took OLLAMA_API_KEY from the environment."
-fi
-if [ -z "${GROQ_KEY}" ] && [ -n "${GROQ_API_KEY:-}" ]; then
-  sed -i "s|^GROQ_API_KEY=.*|GROQ_API_KEY=${GROQ_API_KEY}|" "${ENV_FILE}"
-  GROQ_KEY="${GROQ_API_KEY}"
-  echo "Took GROQ_API_KEY from the environment."
-fi
-
-if [ -z "${OLLAMA_KEY}" ] && [ -z "${GROQ_KEY}" ]; then
+if [ -z "${LLM_URL}" ] || [ -z "${LLM_KEY}" ]; then
   cat <<'MSG'
 
-No LLM API key found in .env — the app cannot answer anything without one.
+No LLM gateway configured — the app cannot answer anything without one.
 
-  1. Get a key:
-       OLLAMA_API_KEY  (primary)   https://ollama.com
-       GROQ_API_KEY    (fallback)  https://console.groq.com
-  2. Put it in .env
-  3. Rerun: bash scripts/quickstart.sh
+  1. Put these in .env (or export them, or save them as Codespaces secrets):
+       LITELLM_BASE_URL=https://<gateway>/v1
+       LITELLM_API_KEY=sk-...
+     The gateway must be reachable from where this cluster runs.
+  2. Rerun: bash scripts/quickstart.sh
 
 MSG
   exit 1
 fi
-echo "LLM keys present: ollama=$([ -n "${OLLAMA_KEY}" ] && echo yes || echo no), groq=$([ -n "${GROQ_KEY}" ] && echo yes || echo no)"
+echo "LLM gateway: ${LLM_URL}"
 
 # ── 2. Cluster ───────────────────────────────────────────────────────────────
 step "Checking kind cluster '${CLUSTER_NAME}'"

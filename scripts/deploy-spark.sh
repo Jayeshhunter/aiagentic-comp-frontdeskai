@@ -68,10 +68,9 @@ kubectl -n "${NAMESPACE}" create secret generic frontdeskai-secret \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # ── Secret: the participant's own Langfuse project ───────────────────────────
-# Read from this repo's own .env -- the same file the app reads with load_dotenv()
-# when you run it locally, so one file configures both paths. Copy .env.example to
-# .env and fill in the three LANGFUSE_ values. It is gitignored, so it cannot be
-# committed or pushed.
+# The sandbox terminal already exports LANGFUSE_PUBLIC_KEY / _SECRET_KEY / _HOST,
+# so this normally needs nothing. A value in this repo's own .env (gitignored)
+# wins over the environment, for anyone pointing at a different project.
 #
 # Each participant traces into their OWN Langfuse project, so nobody reads anyone
 # else's prompts.
@@ -99,6 +98,9 @@ if [ -f "${LANGFUSE_ENV_FILE}" ]; then
 else
   LF_PUBLIC=""; LF_SECRET=""; LF_HOST=""; LF_ENVTAG="${NAMESPACE}"
 fi
+[ -n "${LF_PUBLIC}" ] || LF_PUBLIC="${LANGFUSE_PUBLIC_KEY:-}"
+[ -n "${LF_SECRET}" ] || LF_SECRET="${LANGFUSE_SECRET_KEY:-}"
+[ -n "${LF_HOST}" ]   || LF_HOST="${LANGFUSE_HOST:-${LANGFUSE_BASE_URL:-}}"
 
 if [ -n "${LF_PUBLIC}" ] && [ -n "${LF_SECRET}" ] && [ -n "${LF_HOST}" ]; then
   echo "==> Langfuse: your own project at ${LF_HOST} (environment ${LF_ENVTAG})"
@@ -110,7 +112,7 @@ if [ -n "${LF_PUBLIC}" ] && [ -n "${LF_SECRET}" ] && [ -n "${LF_HOST}" ]; then
     --dry-run=client -o yaml | kubectl apply -f -
 else
   echo "==> Langfuse: NOT configured -- the app will deploy and run without it."
-  echo "    cp ${REPO_DIR}/.env.example ${REPO_DIR}/.env  and set:"
+  echo "    No LANGFUSE_* in your environment or .env. To add it, cp .env.example .env and set:"
   echo "      LANGFUSE_PUBLIC_KEY=pk-lf-..."
   echo "      LANGFUSE_SECRET_KEY=sk-lf-..."
   echo "      LANGFUSE_HOST=https://<your-region>.cloud.langfuse.com"

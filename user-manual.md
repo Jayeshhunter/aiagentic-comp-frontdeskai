@@ -74,16 +74,16 @@ What is the leave usage across the company?
 
 ```
 What model are we using?
-Switch to qwen3-next:80b on ollama
-Change model to llama-3.1-8b-instant on groq
-Switch to OpenRouter with google/gemini-2.0-flash-001 and API key sk-or-...
-Set fallback to groq llama-3.1-8b-instant
-Update ollama api key to ...
+Switch to qwen3-next-80b-lab on litellm
+Change model to gemma4-31b-lab on litellm
+Set fallback to qwen36-35b-a3b-lab on litellm
 ```
 
-Providers: **Ollama Cloud** (primary default `gemma4:cloud`), **Groq** (fallback default
-`llama-3.3-70b-versatile`), **OpenRouter** (`provider/model` format). Changes take effect immediately,
-persist across restarts, and the fallback is used automatically if the primary call fails.
+The provider is **LiteLLM**, one OpenAI-compatible gateway. Its URL and key come from
+`LITELLM_BASE_URL` / `LITELLM_API_KEY`. The workshop gateway serves `qwen36-35b-a3b-lab` (default),
+`qwen3-next-80b-lab`, `gemma4-31b-lab`, `gemma4-26b-a4b-lab` and `gemma4-31b-turbo-lab`. Changes take
+effect immediately, persist across restarts, and the fallback is used automatically if the primary call
+fails.
 
 ### SMTP Email
 
@@ -121,15 +121,16 @@ and terminating are admin-only. See `skills/oci_compute.md`.
 
 ## Updating API Keys Without Rebuilding
 
-```
-Update ollama api key to ...            # admin chat — zero downtime
-```
+**Workshop namespace:** you never handle the key. The app reads it from the `<namespace>-llm` Secret
+that the platform manages. Re-run `bash scripts/deploy-spark.sh` if anything looks wrong.
+
+**kind (Codespace / local):**
 
 ```bash
 bash scripts/update-secret.sh           # from .env — restarts the pod, no rebuild
 
 kubectl patch secret frontdeskai-secret \
-  --type=merge -p '{"stringData":{"GROQ_API_KEY":"<new-key>"}}' \
+  --type=merge -p '{"stringData":{"LITELLM_API_KEY":"<new-key>"}}' \
   && kubectl rollout restart deployment/frontdeskai
 ```
 

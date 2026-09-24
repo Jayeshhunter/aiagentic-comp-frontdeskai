@@ -1,5 +1,6 @@
 #!/bin/bash
 # Update the K8s secret from .env without rebuilding the image.
+# kind/Codespace path only (the sandbox uses deploy-spark.sh).
 # Preserves the existing SECRET_KEY to avoid breaking encrypted SMTP passwords.
 #
 # Usage: bash scripts/update-secret.sh
@@ -25,12 +26,15 @@ while IFS= read -r line; do
   value="${value#\'}" ; value="${value%\'}"
   value="${value%"${value##*[![:space:]]}"}"
   [[ -z "$key" || "$key" =~ [[:space:]] ]] && continue
+  [[ -z "$value" && -n "${!key:-}" ]] && continue
   export "$key=$value"
 done < "${ENV_FILE}"
 
-GROQ_API_KEY="${GROQ_API_KEY:?ERROR: GROQ_API_KEY not set in .env}"
-AUTH_PASSWORD="${AUTH_PASSWORD:?ERROR: AUTH_PASSWORD not set in .env}"
-OLLAMA_API_KEY="${OLLAMA_API_KEY:-}"
+LITELLM_BASE_URL="${LITELLM_BASE_URL:?ERROR: LITELLM_BASE_URL not set in .env or the environment}"
+LITELLM_API_KEY="${LITELLM_API_KEY:?ERROR: LITELLM_API_KEY not set in .env or the environment}"
+AUTH_PASSWORD="${AUTH_PASSWORD:-brainupgrade}"
+LLM_PROVIDER="${LLM_PROVIDER:-litellm}"
+LLM_MODEL="${LLM_MODEL:-${LITELLM_MODEL:-qwen36-35b-a3b-lab}}"
 
 # Preserve existing SECRET_KEY to avoid breaking Fernet-encrypted values in DB
 echo "==> Preserving existing SECRET_KEY from cluster..."
@@ -45,17 +49,15 @@ else
 fi
 
 SECRET_ARGS=(
-  --from-literal=GROQ_API_KEY="${GROQ_API_KEY}"
   --from-literal=AUTH_PASSWORD="${AUTH_PASSWORD}"
   --from-literal=SECRET_KEY="${EXISTING_SECRET_KEY}"
+  --from-literal=LLM_PROVIDER="${LLM_PROVIDER}"
+  --from-literal=LLM_MODEL="${LLM_MODEL}"
+  --from-literal=LITELLM_BASE_URL="${LITELLM_BASE_URL}"
+  --from-literal=LITELLM_API_KEY="${LITELLM_API_KEY}"
+  --from-literal=LLM_FALLBACK_PROVIDER="${LLM_FALLBACK_PROVIDER:-}"
+  --from-literal=LLM_FALLBACK_MODEL="${LLM_FALLBACK_MODEL:-}"
 )
-
-if [ -n "${OLLAMA_API_KEY}" ]; then
-  SECRET_ARGS+=(--from-literal=OLLAMA_API_KEY="${OLLAMA_API_KEY}")
-  echo "==> Ollama API key included"
-else
-  echo "==> WARNING: OLLAMA_API_KEY not set in .env — Ollama Cloud fallback will be disabled"
-fi
 
 # Langfuse — include only if all three vars are set
 LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY:-}"

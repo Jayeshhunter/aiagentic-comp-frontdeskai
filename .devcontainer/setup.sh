@@ -30,7 +30,7 @@ python3 - <<'PY'
 import os, re, pathlib
 env = pathlib.Path(".env")
 text = env.read_text()
-for var in ("OLLAMA_API_KEY", "GROQ_API_KEY",
+for var in ("LITELLM_BASE_URL", "LITELLM_API_KEY", "LLM_MODEL",
             "LANGFUSE_SECRET_KEY", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_HOST"):
     value = os.environ.get(var, "")
     if not value:
@@ -47,14 +47,14 @@ PY
 # localhost paths stay identical — do not duplicate the kind config here.
 bash scripts/create-kind-cluster.sh frontdeskai
 
-# With a key available we can go all the way to a running app with seeded demo
-# data; without one there is nothing useful to deploy yet.
+# With a gateway configured we can go all the way to a running app with seeded
+# demo data; without one there is nothing useful to deploy yet.
 have_key=false
-grep -qE '^(OLLAMA|GROQ)_API_KEY=.+' .env && have_key=true
+grep -qE '^LITELLM_BASE_URL=.+' .env && grep -qE '^LITELLM_API_KEY=.+' .env && have_key=true
 
 if [ "${have_key}" = "true" ]; then
   echo ""
-  echo "==> LLM key found — deploying the app so it is ready when you open it..."
+  echo "==> LLM gateway found — deploying the app so it is ready when you open it..."
   bash scripts/quickstart.sh || {
     echo ""
     echo "!!! Automatic deploy failed. Rerun manually: bash scripts/quickstart.sh"
@@ -64,16 +64,16 @@ else
   echo "=========================================================="
   echo " Almost there — two steps left"
   echo "=========================================================="
-  echo " 1. Put an LLM API key in .env (either one is enough):"
-  echo "      OLLAMA_API_KEY  (primary)   https://ollama.com"
-  echo "      GROQ_API_KEY    (fallback)  https://console.groq.com"
+  echo " 1. Put your LLM gateway in .env (both are required):"
+  echo "      LITELLM_BASE_URL=https://<gateway>/v1"
+  echo "      LITELLM_API_KEY=sk-..."
   echo " 2. bash scripts/quickstart.sh"
   echo ""
   echo " That deploys the app with demo data pre-seeded, plus the MCP Leave"
   echo " Service, and prints the URL and demo logins when it is ready."
   echo ""
-  echo " Tip: save the key as a Codespaces secret named OLLAMA_API_KEY and the"
-  echo " next codespace you create deploys itself with no manual steps."
+  echo " Tip: save both as Codespaces secrets (same names) and the next"
+  echo " codespace you create deploys itself with no manual steps."
   echo "=========================================================="
   echo " Note: the app runs in the kind cluster only. Its Python deps are baked"
   echo " into the image by Containerfile and deliberately NOT installed here, so"

@@ -36,19 +36,20 @@ while IFS= read -r line; do
   value="${value%"${value##*[![:space:]]}"}"
   # Skip if key is empty or contains spaces (malformed line)
   [[ -z "$key" || "$key" =~ [[:space:]] ]] && continue
+  # An empty .env entry must not blank a value the environment already has
+  # (the sandbox exports LITELLM_*; a Codespace exports its secrets).
+  [[ -z "$value" && -n "${!key:-}" ]] && continue
   export "$key=$value"
 done < "${ENV_FILE}"
 
-# At least one LLM key is required. Ollama Cloud is the primary provider and Groq
-# the automatic fallback, so either alone is enough to get a working app.
-OLLAMA_API_KEY="${OLLAMA_API_KEY:-}"
-GROQ_API_KEY="${GROQ_API_KEY:-}"
-if [ -z "${OLLAMA_API_KEY}" ] && [ -z "${GROQ_API_KEY}" ]; then
-  echo "ERROR: no LLM API key found in ${ENV_FILE}."
-  echo "       Set OLLAMA_API_KEY (primary, https://ollama.com) and/or"
-  echo "       GROQ_API_KEY (fallback, https://console.groq.com), then rerun this script."
+# The app cannot answer anything without an LLM: a LiteLLM gateway URL and key.
+if [ -z "${LITELLM_BASE_URL:-}" ] || [ -z "${LITELLM_API_KEY:-}" ]; then
+  echo "ERROR: LITELLM_BASE_URL and LITELLM_API_KEY must both be set (in ${ENV_FILE}"
+  echo "       or in the environment). The gateway must be reachable from this cluster."
   exit 1
 fi
+LLM_PROVIDER="${LLM_PROVIDER:-litellm}"
+LLM_MODEL="${LLM_MODEL:-${LITELLM_MODEL:-qwen36-35b-a3b-lab}}"
 AUTH_PASSWORD="${AUTH_PASSWORD:-brainupgrade}"
 
 CURRENT_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
@@ -68,22 +69,17 @@ apply_secret() {
   fi
 
   SECRET_ARGS=(
-    --from-literal=GROQ_API_KEY="${GROQ_API_KEY}"
     --from-literal=SECRET_KEY="${EXISTING_SECRET_KEY}"
     --from-literal=AUTH_PASSWORD="${AUTH_PASSWORD}"
+    --from-literal=LLM_PROVIDER="${LLM_PROVIDER}"
+    --from-literal=LLM_MODEL="${LLM_MODEL}"
+    --from-literal=LITELLM_BASE_URL="${LITELLM_BASE_URL}"
+    --from-literal=LITELLM_API_KEY="${LITELLM_API_KEY}"
+    # Empty model = no fallback: there is no second gateway to fall back to.
+    --from-literal=LLM_FALLBACK_PROVIDER="${LLM_FALLBACK_PROVIDER:-}"
+    --from-literal=LLM_FALLBACK_MODEL="${LLM_FALLBACK_MODEL:-}"
   )
-  if [ -n "${OLLAMA_API_KEY:-}" ]; then
-    SECRET_ARGS+=(--from-literal=OLLAMA_API_KEY="${OLLAMA_API_KEY}")
-    echo "    Ollama API key included (primary LLM)"
-  else
-    echo "    OLLAMA_API_KEY not set — the primary provider is unavailable, every"
-    echo "    request will be served by the Groq fallback"
-  fi
-  if [ -n "${GROQ_API_KEY:-}" ]; then
-    echo "    Groq API key included (fallback LLM)"
-  else
-    echo "    GROQ_API_KEY not set — no fallback if Ollama Cloud rate-limits"
-  fi
+  echo "    LLM: ${LLM_PROVIDER} / ${LLM_MODEL} via ${LITELLM_BASE_URL}"
   if [ -n "${LANGFUSE_SECRET_KEY:-}" ] && [ -n "${LANGFUSE_PUBLIC_KEY:-}" ] && [ -n "${LANGFUSE_HOST:-}" ]; then
     SECRET_ARGS+=(
       --from-literal=LANGFUSE_SECRET_KEY="${LANGFUSE_SECRET_KEY}"

@@ -5,13 +5,13 @@ capability in plain English; the system researches APIs, writes Python, validate
 disk, stores its config encrypted, and exposes it to domain workers — all at runtime, no rebuild.
 Skills, LLM provider, and SMTP settings survive restarts.
 
-**Stack:** FastAPI · LangGraph · Ollama Cloud / Groq / OpenRouter / any OpenAI-compatible gateway · SQLite · ChromaDB · OpenTelemetry
+**Stack:** FastAPI · LangGraph · LiteLLM (OpenAI-compatible gateway) · SQLite · ChromaDB · OpenTelemetry
 
 ## Documentation
 
 | Doc | Use it when you want to… |
 |---|---|
-| **[participant-instructions.md](participant-instructions.md)** | Deploy it — Codespace, kind, or local; observability; MCP; troubleshooting |
+| **[participant-instructions.md](participant-instructions.md)** | Deploy it — your Kubernetes namespace (workshop), Codespace, or local; troubleshooting |
 | **[use-case-scenarios.md](use-case-scenarios.md)** | **Experience it** — a guided tour, in order, over the seeded demo data |
 | **[user-manual.md](user-manual.md)** | Use it — what to type in chat as an employee or admin |
 | **[observability.md](observability.md)** | Read the metrics, spans, logs, and Grafana dashboard |
@@ -20,29 +20,35 @@ Skills, LLM provider, and SMTP settings survive restarts.
 
 ## Quick Start
 
+The app needs an LLM to do anything. It uses one **LiteLLM gateway** (`LITELLM_BASE_URL` +
+`LITELLM_API_KEY`). No Ollama, Groq or other vendor key is needed.
+
+**Workshop: deploy into your own Kubernetes namespace.** In your sandbox's JupyterLab terminal,
+`APP_NAMESPACE`, `APP_HOST`, the `LITELLM_*` and the `LANGFUSE_*` variables are already set, so there is no
+`.env` to write and no image to build:
+
 ```bash
+cd ~/work
 git clone https://github.com/brainupgrade-in/aiagentic-comp-frontdeskai.git
 cd aiagentic-comp-frontdeskai
-cp .env.example .env          # set OLLAMA_API_KEY (primary) and/or GROQ_API_KEY (fallback)
-
-bash scripts/quickstart.sh    # cluster if needed → app → MCP → health check → seed check
+bash scripts/deploy-spark.sh          # no arguments
+echo "https://$APP_HOST"              # your app URL, served by the Ingress in your namespace
 ```
 
-That is the whole setup. `quickstart.sh` is idempotent, so re-run it any time.
+It pulls the published `brainupgrade/frontdeskai` image (amd64 + arm64) and wires the app to your own
+gateway key. See [participant-instructions.md](participant-instructions.md#option-a-your-kubernetes-namespace-workshop).
 
-**On a Kubernetes cluster where the platform provides the LLM** (a workshop sandbox with
-`APP_NAMESPACE` and `APP_HOST` already exported), there is no `.env` and no vendor key to set:
+**Optional: GitHub Codespace or your own machine.** This needs a LiteLLM gateway that is reachable from
+there. The workshop gateway is internal to the cluster, so it is not.
 
 ```bash
-bash scripts/deploy-spark.sh   # no arguments — reads your namespace and host from the environment
+cp .env.example .env          # set LITELLM_BASE_URL and LITELLM_API_KEY
+bash scripts/quickstart.sh    # kind cluster if needed → app → MCP → health check → seed check
 ```
 
-It pulls the published `brainupgrade/frontdeskai` image (amd64 + arm64) and wires the app to the
-in-cluster gateway. See `CLAUDE.md` for the constraints that path is built around.
-
-In a **Codespace** you can skip even that: save `OLLAMA_API_KEY` as a Codespaces secret before you create
-the codespace, and the devcontainer deploys everything for you — wait for the `FrontDesk AI is ready`
-banner.
+In a Codespace, save `LITELLM_BASE_URL` and `LITELLM_API_KEY` as Codespaces secrets before you create it,
+and the devcontainer deploys everything for you. Wait for the `FrontDesk AI is ready` banner, then open
+forwarded port 8000.
 
 ```bash
 # …or run directly against a Python env, no Kubernetes
@@ -50,7 +56,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r app/requirements.txt && python app/app.py
 ```
 
-Open **http://localhost:8000** and log in as `rajesh.kumar@unigps.in` with `brainupgrade`. First login
+Open your app URL (or **http://localhost:8000** locally) and log in as `rajesh.kumar@unigps.in` with `brainupgrade`. First login
 hashes and stores that password per user; the shared password stops working for them afterwards.
 
 Demo data is pre-seeded (`SEED_DEMO_DATA=true` in `deployment.yaml` and `.env.example`): 10 employees,
@@ -175,9 +181,11 @@ across restarts): LLM model/provider/API key, fallback LLM, SMTP settings, per-s
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OLLAMA_API_KEY` | Ollama Cloud key — primary LLM (`api.ollama.com`) | (required) |
-| `GROQ_API_KEY` | Groq key — fallback LLM | (recommended) |
-| `OPENROUTER_API_KEY` | OpenRouter key, if switching provider | — |
+| `LLM_PROVIDER` | LLM provider | `litellm` (set by every deploy path) |
+| `LITELLM_BASE_URL` | OpenAI-compatible gateway URL, ending in `/v1` | (required; set in the workshop sandbox) |
+| `LITELLM_API_KEY` | Your gateway key | (required; set in the workshop sandbox) |
+| `LLM_MODEL` | Model name on the gateway | `qwen36-35b-a3b-lab` |
+| `LLM_FALLBACK_PROVIDER` / `LLM_FALLBACK_MODEL` | Second model to use if the first fails; empty disables it | empty |
 | `SECRET_KEY` | JWT signing + encryption key derivation | Auto-generated (set it in production) |
 | `AUTH_PASSWORD` | Shared password for first-time login | `brainupgrade` |
 | `ADMIN_EMAILS` | Comma-separated admin emails | `admin@unigps.in` |
@@ -187,9 +195,10 @@ across restarts): LLM model/provider/API key, fallback LLM, SMTP settings, per-s
 | `MCP_LEAVE_URL` | MCP Leave Server endpoint | `http://mcp-leave.postgres.svc.cluster.local:8001/mcp` |
 | `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | Langfuse tracing (optional) | — |
 
-**LLM providers:** Ollama Cloud (`gemma4:cloud`, `qwen3-next:80b`, `deepseek-v3.1:671b`, …), Groq
-(`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, …), OpenRouter (100+ models as `provider/model`). If
-the primary errors, the configured fallback is used automatically.
+**LLM:** every deploy path uses the `litellm` provider against one gateway. The workshop gateway serves
+`qwen36-35b-a3b-lab`, `qwen3-next-80b-lab`, `gemma4-31b-lab`, `gemma4-26b-a4b-lab` and
+`gemma4-31b-turbo-lab`. An admin can switch models, or set one of them as the fallback, from chat. The
+code still supports `ollama`, `groq` and `openrouter`, but no deploy script configures them.
 
 ## Storage
 
@@ -228,7 +237,10 @@ tracing: **[langfuse-setup.md](langfuse-setup.md)**.
 
 ## Access
 
-The kind cluster uses `extraPortMappings`, so NodePort services bind directly to `localhost` — no
+**Workshop namespace:** `https://$APP_HOST`, through the Ingress in your namespace. Traces are in the shared
+Tempo as `frontdeskai-<namespace>`.
+
+**kind (Codespace / local):** the cluster uses `extraPortMappings`, so NodePort services bind directly to `localhost` — no
 `kubectl port-forward`.
 
 | Service | URL | NodePort |

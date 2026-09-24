@@ -36,47 +36,13 @@ spec:
                 - ALL
           ports:
             - containerPort: 8000
+          envFrom:
+            # LLM (LLM_PROVIDER, LLM_MODEL, LITELLM_BASE_URL, LITELLM_API_KEY, empty
+            # fallback), SECRET_KEY, AUTH_PASSWORD and optional LANGFUSE_* — all
+            # written by scripts/deploy.sh from .env and the environment.
+            - secretRef:
+                name: frontdeskai-secret
           env:
-            - name: GROQ_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: GROQ_API_KEY
-            - name: OLLAMA_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: OLLAMA_API_KEY
-                  optional: true
-            - name: SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: SECRET_KEY
-            - name: AUTH_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: AUTH_PASSWORD
-            # Langfuse config
-            - name: LANGFUSE_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: LANGFUSE_SECRET_KEY
-                  optional: true
-            - name: LANGFUSE_PUBLIC_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: LANGFUSE_PUBLIC_KEY
-                  optional: true
-            - name: LANGFUSE_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: frontdeskai-secret
-                  key: LANGFUSE_HOST
-                  optional: true
             # Pre-populate demo employees, leave, tickets, expenses, rooms, payslips
             # (see use-case-scenarios.md — set to "false" for a clean instance)
             - name: SEED_DEMO_DATA

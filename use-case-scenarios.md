@@ -6,11 +6,11 @@ new capability while you watch.
 
 ## Before You Start
 
-**1. Demo data is already seeded.** `bash scripts/quickstart.sh` (or a Codespace launched with an
-`OLLAMA_API_KEY` secret) deploys the app with `SEED_DEMO_DATA=true`, which populates 10 employees, leave
-balances, 5 tickets, 5 expense claims, 5 meeting rooms, and payslips — and then verifies the row counts
-before telling you it is ready. Part 9 additionally needs the MCP stack, which `quickstart.sh` deploys
-too.
+**1. Demo data is already seeded.** Every deploy path (`bash scripts/deploy-spark.sh` in your workshop
+namespace, or `bash scripts/quickstart.sh` in a Codespace or on kind) sets `SEED_DEMO_DATA=true`, which
+populates 10 employees, leave balances, 5 tickets, 5 expense claims, 5 meeting rooms, and payslips. Part 9
+additionally needs the MCP stack, which `quickstart.sh` deploys on kind; it is not available in a workshop
+namespace.
 
 If your PVC predates the seed flag, the seed is idempotent and fills in on the next pod start:
 
@@ -445,8 +445,8 @@ Log in as `admin@unigps.in`. Everything from here is `skill_admin` — non-admin
 
 ```
 What model are we using?
-Switch to qwen3-next:80b on ollama
-Set fallback to groq llama-3.1-8b-instant
+Switch to qwen3-next-80b-lab on litellm
+Set fallback to gemma4-31b-lab on litellm
 ```
 
 **What to observe:** the model swaps mid-conversation. Ask a normal HR question immediately afterwards
@@ -460,7 +460,7 @@ The fallback LLM is not decoration — it takes over silently whenever the prima
 Force it:
 
 ```
-Switch to a-model-that-does-not-exist on ollama
+Switch to a-model-that-does-not-exist on litellm
 ```
 
 Then ask any ordinary question as an employee. **What to observe:** you still get a real answer. The
@@ -473,7 +473,7 @@ kubectl logs deployment/frontdeskai | grep -iE "llm call (failed|completed)"
 
 In Langfuse (Part 10) the same request shows the primary generation marked **ERROR** followed by a
 successful one on the fallback model. Restore the good model afterwards with
-`switch to gemma4:cloud on ollama`.
+`switch to qwen36-35b-a3b-lab on litellm`.
 
 Note the distinction: the `(via fallback)` note on a reply means something *different* — that the graph
 gave up after two QA failures and served a static template. Provider failover is invisible by design;
@@ -569,7 +569,8 @@ OCI API private key is set through conversation and stored encrypted — no Kube
 ## Part 9 — Reaching Outside: MCP
 
 Already deployed if you ran `scripts/quickstart.sh`; otherwise `bash scripts/deploy-mcp.sh` (PostgreSQL +
-MCP Leave Server in the `postgres` namespace).
+MCP Leave Server in the `postgres` namespace). **Not available in a workshop namespace**, which cannot
+create the `postgres` namespace. There, read this part rather than run it.
 
 The MCP server has its **own** employee roster, separate from the app's SQLite. Log in as
 `alice@unigps.in` and ask:
