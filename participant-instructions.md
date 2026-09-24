@@ -96,6 +96,11 @@ bash scripts/deploy-spark.sh
 
 ### Troubleshooting
 
+**Your app URL shows `503 Service Temporarily Unavailable`** — nothing is running behind it yet. Your
+namespace has the Ingress from the start, but the app only exists after `bash scripts/deploy-spark.sh`
+finishes. Also expected for about 30 seconds during every redeploy. If it stays, run
+`kubectl get pods -l app=frontdeskai`.
+
 **`ERROR: APP_HOST is not set`** — you are not in the sandbox's JupyterLab terminal. Open a new terminal
 there.
 
