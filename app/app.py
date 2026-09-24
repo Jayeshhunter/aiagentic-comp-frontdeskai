@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from langgraph.checkpoint.sqlite import SqliteSaver
+from opentelemetry.trace import SpanKind
 
 from agents import build_graph
 from auth import get_user_password, set_user_password, verify_password, current_user_email, _get_auth_db
@@ -294,7 +295,9 @@ async def send_message(request: Request, message: str = Form(...)):
             {"role": row["role"], "content": row["content"]} for row in reversed(history_rows)
         ]
 
-        with tracer.start_as_current_span("chat.send") as span:
+        # SERVER: the entry point of a request, so the service graph shows the
+        # app being called (by "user") and calling out to the LLM.
+        with tracer.start_as_current_span("chat.send", kind=SpanKind.SERVER) as span:
             span.set_attribute("user.email", user)
             span.set_attribute("chat.history_turns", len(conversation_history))
 

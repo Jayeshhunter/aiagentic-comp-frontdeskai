@@ -18,7 +18,7 @@ from opentelemetry.sdk.metrics.view import (
 )
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import SpanKind, StatusCode
 from prometheus_client import make_asgi_app
 
 try:
@@ -275,7 +275,13 @@ def trace_llm_call(agent_name: str):
     """Context manager: creates a span, measures duration, yields a dict for token capture."""
     tracer = get_tracer()
     ctx = {"response": None, "token_handler": TokenCaptureHandler()}
-    with tracer.start_as_current_span(f"llm.{agent_name}") as span:
+    # CLIENT + peer.service is what makes Tempo's service graph draw the LLM
+    # provider as its own node; an INTERNAL span never appears on the map.
+    with tracer.start_as_current_span(
+        f"llm.{agent_name}",
+        kind=SpanKind.CLIENT,
+        attributes={"peer.service": os.getenv("LLM_PROVIDER", "ollama")},
+    ) as span:
         span.set_attribute("agent.name", agent_name)
         start = time.monotonic()
         try:
