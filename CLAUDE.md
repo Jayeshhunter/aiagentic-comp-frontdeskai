@@ -302,7 +302,7 @@ SHA and `latest`, for **linux/amd64 and linux/arm64**.
 | | |
 |---|---|
 | **The nodes are arm64** | The cluster is a DGX Spark. An amd64-only image fails to pull with `no match for platform in manifest` and the pod sits in `ImagePullBackOff`. The workflow builds both arches; the arm64 leg is QEMU-emulated and takes ~12 min against ~2 for amd64 alone |
-| **No internet egress** | `participant-egress` allows DNS, the `llm-serving` namespace, ingress-nginx and Langfuse:3000 — **nothing else**. This is *not* the `agenticai` sandbox namespace, which has `allow-egress-internet`. Anything fetched at startup must be baked into the image |
+| **Restricted egress** | `participant-egress` allows DNS, the `llm-serving` namespace, ingress-nginx, Langfuse:3000, `monitoring` on 4317/4318 (OTLP only — Tempo/Loki/Prometheus cannot be *queried* from the namespace), and **public internet on 80/443 only** (checked 2026-09-25; `search_web`, `fetch_webpage` and skill APIs work). Anything fetched at startup should still be baked into the image |
 | **1Gi of memory limits for the whole namespace** | One pod at a 1Gi limit consumes all of it, so the Deployment uses `strategy: Recreate`. A RollingUpdate surges a second pod, which is quota-denied, and the rollout hangs with no useful message. A `kubectl run` debug pod is refused for the same reason — use `kubectl exec` into the app container, which ships Python |
 | **Zero NodePorts** | `services.nodeports: 0`. ClusterIP + Ingress only |
 | **The host is behind Cloudflare** | Two separate traps. It answers the default Python user agent with `403` / `error code: 1010`, so anything scripted against the public hostname needs a `User-Agent` header. And it gives up at **~100s with a 524** — a three-turn agent request exceeds that whenever the gateway is slow, and the 524 reads as a broken app while the pod is still working. Script against the pod (`kubectl exec … python3`), not the hostname |
@@ -313,7 +313,7 @@ SHA and `latest`, for **linux/amd64 and linux/arm64**.
 `tempo.monitoring.svc.cluster.local:4317` and sets
 **`OTEL_SERVICE_NAME=frontdeskai-<namespace>`** — one Tempo serves the whole cohort, so the
 service name has to carry the namespace or nobody can find their own traces. Read them in
-Grafana: *Explore → Tempo → service.name*.
+Grafana: *Explore → Tempo → service.name*. ⚠️ Tempo and Loki are scaled to 0 between cohorts — start them before a session.
 
 What a request produces, measured on u31: a `chat.send` root span with `user.email`,
 `chat.history_turns` and `chat.category`, and a child span per agent step —

@@ -37,8 +37,8 @@ data:
 
   # HOME is deliberately NOT set here. The image points it at /opt/appcache,
   # where the ChromaDB ONNX embedding model is baked in; overriding it sends
-  # chromadb looking for a model it would then try to download, and this
-  # namespace has no internet egress.
+  # chromadb looking for a model it would then download on every start, from
+  # 30 namespaces at once. Keep it baked in.
   SQLITE_DIR: "/shared/.sqlite"
 
   # Fails closed if SECRET_KEY is missing rather than minting a throwaway one.

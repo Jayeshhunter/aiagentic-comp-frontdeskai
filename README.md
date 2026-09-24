@@ -237,10 +237,11 @@ tracing: **[langfuse-setup.md](langfuse-setup.md)**.
 
 ## Access
 
-**Workshop namespace:** `https://$APP_HOST`, through the Ingress in your namespace. Traces are in the shared
-Tempo as `frontdeskai-<namespace>`.
+**Workshop namespace:** the app is at `https://$APP_HOST`, through the Ingress in your namespace. Grafana is
+at `https://agenticai<cohort>-grafana.brainupgrade.in` (the trainer shares the login), with your traces
+under service `frontdeskai-<namespace>`. Langfuse is at `$LANGFUSE_HOST`.
 
-**kind (Codespace / local):** the cluster uses `extraPortMappings`, so NodePort services bind directly to `localhost` — no
+**kind (Codespace / local — not part of the workshop):** the cluster uses `extraPortMappings`, so NodePort services bind directly to `localhost` — no
 `kubectl port-forward`.
 
 | Service | URL | NodePort |

@@ -11,7 +11,7 @@ Runs the **real** `hr_worker` against the **real** model, so it needs the app's
 environment. Run it in the deployed pod:
 
 ```bash
-NS=agenticaiu31
+NS=$APP_NAMESPACE   # your namespace; already set in the sandbox terminal
 kubectl -n $NS cp scripts/eval/hr_worker_eval.py \
   $(kubectl -n $NS get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/tmp/e.py
 kubectl -n $NS exec deploy/frontdeskai -- python3 /tmp/e.py

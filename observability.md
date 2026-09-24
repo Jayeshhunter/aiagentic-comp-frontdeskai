@@ -19,8 +19,10 @@ FrontDesk AI (FastAPI)
                     Correlated via trace_id + span_id
 ```
 
-**Live on the workshop cluster since 2026-09-11.** All three legs are deployed in
-namespace `monitoring`, and the trace ↔ log jump works in **both** directions:
+**On the workshop cluster** all three legs run in namespace `monitoring`, shared by the cohort (see
+[Where this actually runs](#where-this-actually-runs)). ⚠️ Tempo and Loki are scaled down between
+cohorts and started by the trainer for a session: if Grafana shows no traces or logs, ask your trainer
+before you debug the app. The trace ↔ log jump works in **both** directions:
 
 | Direction | Mechanism | Where it is configured |
 |---|---|---|
@@ -174,7 +176,7 @@ prometheus-client==0.21.0
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://tempo.monitoring.svc.cluster.local:4317` | Tempo OTLP gRPC endpoint |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
-All observability configuration is externalized via environment variables set in `scripts/manifests/deployment.yaml`. No observability endpoints or service names are hardcoded in the application code.
+All observability configuration is externalized via environment variables: `scripts/manifests/spark/configmap.yaml` in a workshop namespace (where `deploy-spark.sh` sets `OTEL_SERVICE_NAME=frontdeskai-<namespace>`), `scripts/manifests/deployment.yaml` on kind. No observability endpoints or service names are hardcoded in the application code.
 
 ### Kubernetes Pod Annotations
 
@@ -336,10 +338,13 @@ On the **workshop cluster** the same stack exists, deployed separately into the
 
 | | endpoint | notes |
 |---|---|---|
-| Tempo | `tempo.monitoring.svc:4317` (OTLP gRPC) | `OTEL_SERVICE_NAME` carries the namespace, so your traces are findable |
-| Loki | `loki.monitoring.svc:3100` | Promtail DaemonSet tails every pod; **since 2026-09-11** |
+| Tempo | `tempo.monitoring.svc:4317` (OTLP gRPC) | `OTEL_SERVICE_NAME` is `frontdeskai-<your namespace>`, so your traces are findable |
+| Loki | `loki.monitoring.svc:3100` | Promtail tails every pod |
 | Prometheus | scraped by the platform | the `frontdeskai-participants` job, matching pod label `app=frontdeskai` |
-| Grafana | datasources `loki`, `tempo`, `prometheus-nuc` | log lines carry a **View trace** link into Tempo |
+| Grafana | `https://agenticai<cohort>-grafana.brainupgrade.in` — the `<cohort>` part is the same as in your `APP_HOST`; the trainer shares the login | datasources `Tempo`, `Loki`, `Prometheus`, `Prometheus-NUC`; log lines carry a **View trace** link into Tempo |
+
+Your namespace can send spans to Tempo (ports 4317/4318) but cannot query Tempo, Loki or Prometheus
+directly, so read everything through Grafana.
 
 In Grafana's Explore, `{namespace="<your namespace>", app="frontdeskai"}` is your app's
 logs; add `agent=~".+"` for just the LLM-call lines, which are labelled per agent.
@@ -352,72 +357,62 @@ regexes it out of the line at query time. Log → trace works; `{trace_id="..."}
 
 Two dashboards read these metrics.
 
-**"FrontDesk AI — Agent Performance"** (uid `frontdeskai-agent-performance`) is the workshop one:
-per-agent evaluation and tuning, filterable by participant namespace. Its JSON lives in the course
-repo under `resources/`, not here — where the time goes, where the tokens go, how many ReAct
-iterations each worker burned, and a per-agent scorecard. It leads with **means**, which are always
-correct, and shows percentiles alongside them.
+**"FrontDesk AI — Agent Performance"** (uid `frontdeskai-agent-performance`, folder *FrontDesk AI*) is
+the workshop one: per-agent evaluation and tuning, filterable by participant namespace. It is
+provisioned in the workshop Grafana, not shipped in this repo. It shows where the time goes, where the
+tokens go, how many ReAct iterations each worker burned, and a per-agent scorecard. It leads with
+**means**, which are always correct, and shows percentiles alongside them. The same folder also holds
+*FrontDesk AI — Cost & Workflow*.
 
-⚠️ `resources/frontdeskai-dashboard.json` in this repo plots "Response Latency (P50 / P95 / P99)".
-Those panels were meaningless before the bucket fix and are correct after it — but only against a
-pod running an image built from 2026-09-11 or later.
+**"FrontDesk AI — App Health"** (uid `frontdeskai-app`) is the kind one, installed by
+`scripts/install-observability.sh` from `resources/frontdeskai-dashboard.json`. Its rows, top to bottom:
 
-A dedicated dashboard **"Agentic AI Observability"** is also available in Grafana (`aiagentic-comp` folder).
+| Row | Panels |
+|---|---|
+| Health Overview | Pod Status, Request Rate, LLM Error Rate, P95 Response Time, Fallback Rate, Pod Restarts (1h) |
+| Request Traffic | Request Rate, Response Latency (P50 / P95 / P99) |
+| LLM Health | LLM Error Rate by Agent, LLM Call Duration P95 by Agent |
+| Agent Behavior | Requests by Category, Escalations & Fallbacks |
+| Error Logs | Recent ERROR Logs (Loki) |
+| LLM Token Usage | Token Consumption by Agent, and 1h totals for tokens, requests, LLM errors and escalations |
 
-**Panels (top to bottom):**
-
-| Panel | Type | Data Source | Description |
-|-------|------|------------|-------------|
-| Avg Request Duration | Bar Gauge | Prometheus | Avg request + LLM call duration (instant query, `sum/count`) |
-| Avg LLM Duration by Agent | Bar Gauge | Prometheus | Per-agent LLM latency breakdown |
-| Requests by Category | Bar Gauge | Prometheus | Cumulative request count per category |
-| Tokens by Agent | Bar Gauge | Prometheus | Cumulative token consumption per agent |
-| Request Activity | Time Series | Prometheus | Category counter over time (cumulative) |
-| Token Accumulation | Time Series | Prometheus | Token counter over time (cumulative) |
-| Category Distribution | Pie Chart | Prometheus | Donut chart of request categories |
-| Total Tokens / Requests / Escalations / Errors | Stat | Prometheus | Summary stat panels |
-| All Application Logs | Logs | Loki | JSON logs filtered by `trace_id != "0"` |
-| Recent Traces | Table | Loki | One row per trace with clickable Trace ID → Tempo Explore |
-
-**Note**: The Recent Traces panel uses Loki (not Tempo TraceQL) due to a Grafana 12.x gRPC streaming limitation with Tempo's HTTP API. Trace IDs are clickable data links that open the full trace waterfall in Grafana Explore via Tempo.
+⚠️ The latency percentile panels were meaningless before the bucket fix and are correct after it, but
+only against a pod running an image built from 2026-09-11 or later.
 
 ## Verifying the Setup
 
-### Check Traces in Tempo
+### Workshop namespace
+
+Send some traffic at your own app (the public URL needs no port-forward):
 
 ```bash
-curl -s "http://tempo.monitoring.svc.cluster.local:3200/api/search?tags=service.name%3Dfrontdeskai&limit=5"
+FRONTDESKAI_URL="https://$APP_HOST" bash scripts/generate-test-traffic.sh 3 0
 ```
 
-### Check Metrics in Prometheus
+The script logs in as `loadtest@test.com` and cycles through questions across all categories. Then, in
+Grafana:
+
+- **Traces** — *Explore → Tempo → service.name = `frontdeskai-<your namespace>`*
+- **Logs** — *Explore → Loki*, query `{namespace="<your namespace>", app="frontdeskai"}`
+- **Metrics** — the *FrontDesk AI — Agent Performance* dashboard, filtered to your namespace
+
+Without Grafana, the pod's own logs carry the same `trace_id` on every line:
 
 ```bash
-curl -s "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/query" \
-  --data-urlencode 'query={__name__=~"frontdeskai.*"}'
+kubectl logs deployment/frontdeskai | grep "LLM call completed" | tail -5
 ```
 
-From outside the cluster, port-forward first (Prometheus has no NodePort):
+### kind (Codespace / local — not part of the workshop)
 
 ```bash
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9091:9090
+bash scripts/generate-test-traffic.sh 5 0       # defaults to http://localhost:8000
+
+# Prometheus and Tempo have no NodePort: port-forward, then query from your machine
+kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9091:9090 &
+curl -s "http://localhost:9091/api/v1/query" --data-urlencode 'query={__name__=~"frontdeskai.*"}'
+
+kubectl -n monitoring port-forward svc/tempo 3200:3200 &
+curl -s "http://localhost:3200/api/search?tags=service.name%3Dfrontdeskai&limit=5"
 ```
 
-### Check Logs in Loki
-
-```bash
-curl -s "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/query_range" \
-  --data-urlencode 'query={app="frontdeskai"} | json' --data-urlencode 'limit=5'
-```
-
-### Send a Test Request
-
-```bash
-# One request against the NodePort-exposed app
-bash scripts/generate-test-traffic.sh 1 0
-
-# Or point it at a different host
-FRONTDESKAI_URL=http://localhost:8000 bash scripts/generate-test-traffic.sh 5 10
-```
-
-The script logs in as `loadtest@test.com` and cycles through questions across all categories, so a
-handful of requests is enough to populate every dashboard panel.
+Grafana is at http://localhost:3000 (`agenticai` / `agentgrow.io`), with Loki as a datasource.

@@ -10,7 +10,7 @@ FrontDesk AI (FastAPI + LangGraph)
 ├── OpenTelemetry ──→ Tempo/Prometheus/Loki ──→ Grafana
 │   (infrastructure observability: spans, metrics, logs)
 │
-└── Langfuse ──→ Langfuse Cloud (region-specific: us.cloud.langfuse.com or cloud.langfuse.com)
+└── Langfuse ──→ Langfuse Cloud (region-specific: jp., us. or cloud.langfuse.com)
     (LLM observability: prompts, completions, tokens, cost, sessions)
 ```
 
@@ -38,12 +38,12 @@ User Request → app/app.py
         └── ...
 ```
 
-Each `llm.invoke()` call — through `ChatOllama`, `ChatGroq`, or `ChatOpenAI` (OpenRouter), whichever
-provider is configured — triggers the callback, which sends:
+Each `llm.invoke()` call — through `ChatOpenAI` pointed at the LiteLLM gateway, the provider every deploy
+path configures — triggers the callback, which sends:
 - Full prompt text
 - Full completion text
 - Token usage (input, output, total)
-- Model name (e.g. `gemma4:cloud` on the default Ollama Cloud provider)
+- Model name (e.g. `qwen36-35b-a3b-lab`, the workshop default)
 - Latency
 - User and session IDs
 
@@ -143,53 +143,39 @@ calls) and in `manager_agent()`.
 |----------|----------|---------|-------------|
 | `LANGFUSE_SECRET_KEY` | Yes | `sk-lf-9327d358-...` | Langfuse project secret key |
 | `LANGFUSE_PUBLIC_KEY` | Yes | `pk-lf-04cea526-...` | Langfuse project public key |
-| `LANGFUSE_HOST` | Yes | `https://us.cloud.langfuse.com` | Region-specific server URL — US and EU are separate installations with separate keys and separate UIs. Keys from one region never show data in the other |
+| `LANGFUSE_HOST` | Yes | `https://jp.cloud.langfuse.com` | Region-specific server URL — JP, US and EU are separate installations with separate keys and separate UIs. Keys from one region never show data in the other |
 
 All three must be set for Langfuse to activate. If any are missing, or if the `langfuse` package is unavailable, the app starts normally without Langfuse — no errors, just a startup log line indicating the reason.
 
-### Getting Langfuse Keys
+### In a workshop namespace — nothing to set
 
-1. Sign up at [https://cloud.langfuse.com](https://cloud.langfuse.com)
-2. Create a new project (e.g., "FrontDesk AI")
-3. Go to **Settings → API Keys**
-4. Copy the **Secret Key** and **Public Key**
+Your sandbox terminal already exports `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_HOST`.
+`bash scripts/deploy-spark.sh` copies them into the `frontdeskai-langfuse` Secret in your namespace, which
+the Deployment loads with `envFrom` (`optional: true`, so the app still starts without it). A value in the
+repo's `.env` wins over the environment, if you want to point at your own project instead.
 
-### Setting Up `.env`
+⚠️ **The workshop project is shared by the whole cohort**, and FrontDesk traces do not yet carry your
+namespace (their environment shows as `default`). To find your own, filter the Traces view by **User ID**
+(the email you logged in as) and by time.
 
-```bash
-cp .env.example .env
-```
+### On kind (Codespace / local — not part of the workshop)
 
-Add your keys to `.env`:
+1. Sign up at [https://cloud.langfuse.com](https://cloud.langfuse.com) and create a project
+2. Go to **Settings → API Keys** and copy the **Secret Key** and **Public Key**
+3. Put all three values in `.env`:
 
 ```env
-OLLAMA_API_KEY=your_ollama_cloud_key_here
-GROQ_API_KEY=gsk_your_groq_key_here
 LANGFUSE_SECRET_KEY=sk-lf-your-secret-key
 LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key
 LANGFUSE_HOST=https://cloud.langfuse.com
 ```
 
-### Kubernetes Deployment
-
-The keys only reach the pod through the `frontdeskai-secret` K8s secret. **Editing `.env` alone changes
-nothing in a running cluster** — this is the most common reason for "keys are configured but Langfuse is
-empty". Rebuild the secret and restart:
+4. The keys only reach the pod through the `frontdeskai-secret` K8s secret, so **editing `.env` alone
+   changes nothing in a running cluster** — this is the most common reason for "keys are configured but
+   Langfuse is empty". Rebuild the secret and restart:
 
 ```bash
-bash scripts/deploy.sh          # or, without an image rebuild:
 bash scripts/update-secret.sh
-```
-
-The deployment manifest mounts Langfuse env vars from the secret with `optional: true`, so the app starts even if Langfuse keys are absent:
-
-```yaml
-- name: LANGFUSE_SECRET_KEY
-  valueFrom:
-    secretKeyRef:
-      name: frontdeskai-secret
-      key: LANGFUSE_SECRET_KEY
-      optional: true
 ```
 
 ## What Langfuse Captures
@@ -209,7 +195,7 @@ The deployment manifest mounts Langfuse env vars from the secret with `optional:
 
 | Field | Source | Example |
 |-------|--------|---------|
-| Model | Active provider config | `gemma4:cloud` |
+| Model | Active provider config | `qwen36-35b-a3b-lab` |
 | Prompt | Full prompt text | `"You are UniGPS HR..."` |
 | Completion | Full response text | `"You have 24 casual leaves..."` |
 | Input Tokens | Provider API response | `156` |
@@ -265,29 +251,31 @@ kubectl logs deployment/frontdeskai --tail=10 | head -5
 Look for both lines — the first at startup, the second on the first chat request:
 
 ```json
-{"message": "Langfuse enabled", "langfuse_host": "https://us.cloud.langfuse.com"}
-{"message": "Langfuse handler ready", "langfuse_host": "https://us.cloud.langfuse.com", "auth_check": true}
+{"message": "Langfuse enabled", "langfuse_host": "https://jp.cloud.langfuse.com"}
+{"message": "Langfuse handler ready", "langfuse_host": "https://jp.cloud.langfuse.com", "auth_check": true}
 ```
 
 `"auth_check": true` means the keys authenticated against that host. `false` (or an `error:` string)
 means the app is configured but the credentials or the region are wrong — traces will never appear no
 matter how much traffic you send. If you see `"Langfuse disabled"` instead, all three env vars are not
-set in the K8s secret.
+set in the pod (see Troubleshooting).
 
 ### 2. Send a Test Request
 
 ```bash
-bash scripts/generate-test-traffic.sh 1 0
+FRONTDESKAI_URL="https://$APP_HOST" bash scripts/generate-test-traffic.sh 1 0   # workshop namespace
+bash scripts/generate-test-traffic.sh 1 0                                     # kind (localhost:8000)
 ```
 
 ### 3. Check Langfuse Cloud
 
-Go to [https://cloud.langfuse.com](https://cloud.langfuse.com) → your project → **Traces**.
+Open `$LANGFUSE_HOST` in a browser (in the workshop, `https://jp.cloud.langfuse.com`) → your project →
+**Traces**. The traffic script logs in as `loadtest@test.com`, so filter by that User ID.
 
 You should see a new trace with:
 - User: the email used for login
 - Generations: 2-3 (supervisor + worker + possibly manager)
-- Model: whatever the active provider is set to (`gemma4:cloud` by default)
+- Model: whatever the active model is (`qwen36-35b-a3b-lab` by default)
 
 ### 4. Verify via Pod Logs
 
@@ -331,19 +319,25 @@ langfuse==2.51.3
 
 ## Disabling Langfuse
 
-To disable Langfuse without code changes, blank the env vars — the app treats empty values as
-"not configured" and starts normally:
+The app treats empty or missing values as "not configured" and starts normally.
+
+**Workshop namespace:** delete the Secret and restart. The next `deploy-spark.sh` recreates it from your
+environment.
+
+```bash
+kubectl delete secret frontdeskai-langfuse
+kubectl rollout restart deployment/frontdeskai
+```
+
+**kind:** blank the three values with a merge patch. Do not use `kubectl create secret ... | kubectl apply`:
+that replaces the whole secret and drops the LLM gateway settings, `SECRET_KEY` and `AUTH_PASSWORD` along
+with it.
 
 ```bash
 kubectl patch secret frontdeskai-secret --type=merge \
   -p '{"stringData":{"LANGFUSE_SECRET_KEY":"","LANGFUSE_PUBLIC_KEY":"","LANGFUSE_HOST":""}}'
 kubectl rollout restart deployment/frontdeskai
 ```
-
-Use `patch --type=merge`, not `kubectl create secret ... | kubectl apply` — the latter replaces the
-whole secret and would drop `OLLAMA_API_KEY`, `SECRET_KEY`, and `AUTH_PASSWORD` along with it.
-
-Or remove the `LANGFUSE_*` lines from `.env` and run `bash scripts/update-secret.sh`.
 
 ## Use Case: Detecting an Infinite LLM Loop Before It Burns Thousands of Dollars
 
@@ -385,7 +379,7 @@ supervisor → hr_worker → escalation_check → qa_check → hr_worker → esc
                                                   ↑___________________________|
 ```
 
-Each cycle makes **2 LLM calls** (worker + potentially manager). With Groq's llama-3.3-70b consuming ~500 tokens per call, the loop burns through tokens at an alarming rate.
+Each cycle makes **2 LLM calls** (worker + potentially manager). At ~500 tokens per call, the loop burns through tokens at an alarming rate.
 
 ### The Cost Impact
 
@@ -396,9 +390,9 @@ Each cycle makes **2 LLM calls** (worker + potentially manager). With Groq's lla
 | Overnight (8 hrs) | ~28,800 | ~57,600 | ~28.8M | $864 |
 | Weekend (48 hrs) | ~172,800 | ~345,600 | ~172M | **$5,184** |
 
-*Groq is free-tier, but the same bug on GPT-4o ($5/1M input, $15/1M output) or Claude would cost thousands. This is a realistic production scenario.*
+*The workshop gateway has a daily cap per key, but the same bug on a paid model such as GPT-4o ($5/1M input, $15/1M output) or Claude would cost thousands. This is a realistic production scenario.*
 
-Even on Groq's free tier, the loop would hit rate limits (30 req/min), causing the request to hang indefinitely and potentially blocking other users.
+Even with a capped key, the loop would exhaust the day's budget, causing the request to hang and blocking every other request that uses the same key.
 
 ### Without Langfuse: How the Bug Hides
 
@@ -453,7 +447,7 @@ Langfuse **Metrics** tab shows:
 - **Token usage spike** at the exact timestamp
 - **Cost per trace** — this single trace consumed more tokens than the previous 100 traces combined
 - **User impact** — the affected user's session was blocked for 4+ minutes
-- **Model** — confirms it's `llama-3.3-70b-versatile` (if on a paid model, shows dollar cost)
+- **Model** — confirms which model was looping (on a paid model, it shows the dollar cost)
 
 #### Step 4: Fix and Verify
 
@@ -530,31 +524,34 @@ This is why Langfuse is essential for agentic AI systems: **traditional observab
 Check which reason is logged:
 
 - `"Langfuse disabled (langfuse package not installed)"` — the `langfuse` library is missing from the environment. Verify `pip install langfuse==2.51.3` ran successfully (it is in `app/requirements.txt`).
-- `"Langfuse disabled (LANGFUSE_SECRET_KEY/PUBLIC_KEY/HOST not set)"` — all three env vars must be non-empty:
+- `"Langfuse disabled (LANGFUSE_SECRET_KEY/PUBLIC_KEY/HOST not set)"` — all three env vars must be
+  non-empty in the pod:
 
 ```bash
-kubectl get secret frontdeskai-secret -o jsonpath='{.data.LANGFUSE_SECRET_KEY}' | base64 -d
-kubectl get secret frontdeskai-secret -o jsonpath='{.data.LANGFUSE_PUBLIC_KEY}' | base64 -d
-kubectl get secret frontdeskai-secret -o jsonpath='{.data.LANGFUSE_HOST}' | base64 -d
+kubectl exec deployment/frontdeskai -- printenv | grep LANGFUSE_HOST
 ```
+
+  In a workshop namespace, check your terminal has them (`env | grep LANGFUSE`) and re-run
+  `bash scripts/deploy-spark.sh`. On kind, fix `.env` and run `bash scripts/update-secret.sh`.
 
 ### No traces appearing in Langfuse Cloud
 
 Work down this list — the first two causes account for most cases:
 
-1. **The keys never left `.env`.** They reach the pod via the K8s secret, so run
-   `bash scripts/deploy.sh` (or `scripts/update-secret.sh`) after editing `.env`, then confirm:
-   `kubectl exec deployment/frontdeskai -- printenv | grep LANGFUSE`
-2. **Wrong region.** `us.cloud.langfuse.com` and `cloud.langfuse.com` are separate installations. Keys
-   issued in one region authenticate only there, and the other region's UI will show an empty project.
-   Check `LANGFUSE_HOST` against the URL you are browsing.
+1. **The keys never reached the pod.** Confirm with
+   `kubectl exec deployment/frontdeskai -- printenv | grep LANGFUSE`. Workshop: re-run
+   `bash scripts/deploy-spark.sh`. kind: `bash scripts/update-secret.sh` after editing `.env`.
+2. **Wrong region.** `jp.cloud.langfuse.com`, `us.cloud.langfuse.com` and `cloud.langfuse.com` are
+   separate installations. Keys issued in one region authenticate only there, and another region's UI
+   shows an empty project. Check `LANGFUSE_HOST` against the URL you are browsing.
 3. Verify the app logs show `"Langfuse enabled"` **and** `"auth_check": true` (see above).
 4. Send a chat request — health checks make no LLM calls, so they produce no traces.
 5. Langfuse batches and then queues server-side; a trace can take up to a minute to appear.
-6. Confirm from outside the UI, using the same keys:
+6. In the workshop project, other participants' traces are there too — filter by your User ID.
+7. Confirm from outside the UI, using the same keys (in the sandbox terminal they are already set; on
+   kind, run `set -a; . ./.env; set +a` first):
 
 ```bash
-set -a; . ./.env; set +a
 curl -s -u "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" "$LANGFUSE_HOST/api/public/traces?limit=3"
 ```
 
@@ -571,4 +568,4 @@ This is already included in `requirements.txt`.
 
 ### Langfuse adds latency
 
-The `LangfuseCallbackHandler` sends data asynchronously in the background. It should not add noticeable latency to request processing. If latency increases, check network connectivity from the cluster to `cloud.langfuse.com`.
+The `LangfuseCallbackHandler` sends data asynchronously in the background. It should not add noticeable latency to request processing. If latency increases, check network connectivity from the cluster to your `LANGFUSE_HOST`.

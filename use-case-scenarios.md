@@ -12,7 +12,7 @@ populates 10 employees, leave balances, 5 tickets, 5 expense claims, 5 meeting r
 additionally needs the MCP stack, which `quickstart.sh` deploys on kind; it is not available in a workshop
 namespace.
 
-If your PVC predates the seed flag, the seed is idempotent and fills in on the next pod start:
+If the counts look wrong, the seed is idempotent and fills gaps on the next pod start:
 
 ```bash
 kubectl rollout restart deployment/frontdeskai
@@ -636,10 +636,12 @@ agent changes.
 
 ### Metrics, traces, and logs
 
-Requires `bash scripts/install-observability.sh`.
-
-Generate some traffic (`bash scripts/generate-test-traffic.sh`, or just run Parts 1–5 again), then open
-Grafana at **http://localhost:3000** (`agenticai` / `agentgrow.io`) and follow one request end to end:
+Generate some traffic (run Parts 1–5 again, or
+`FRONTDESKAI_URL="https://$APP_HOST" bash scripts/generate-test-traffic.sh 3 0`), then open the workshop
+Grafana at `https://agenticai<cohort>-grafana.brainupgrade.in` (the `<cohort>` part is the same as in your
+`APP_HOST`; the trainer shares the login). Your traces are under service `frontdeskai-<your namespace>`.
+On kind, run `bash scripts/install-observability.sh` first and use http://localhost:3000. Follow one
+request end to end:
 
 - **Metrics** — `frontdeskai_category_total` shows your routing distribution; compare
   `frontdeskai_llm_call_duration_seconds` across agents to see which node dominates latency;
@@ -650,23 +652,24 @@ Grafana at **http://localhost:3000** (`agenticai` / `agentgrow.io`) and follow o
 
 ### Langfuse — reading the actual prompt
 
-Requires the three `LANGFUSE_*` keys in `.env` **and** a deploy afterwards, since the keys reach the pod
-through the `frontdeskai-secret` K8s secret that `scripts/deploy.sh` rebuilds. Confirm it is live:
+In a workshop namespace this is already on: `deploy-spark.sh` took the `LANGFUSE_*` keys from your
+terminal. (On kind, put them in `.env` and run `bash scripts/update-secret.sh`.) Confirm it is live:
 
 ```bash
 kubectl logs deployment/frontdeskai | grep -i langfuse
 # "Langfuse enabled" at startup, then "Langfuse handler ready" with "auth_check": true
 ```
 
-Open your project — mind the region, `us.cloud.langfuse.com` and `cloud.langfuse.com` are separate
-installations with separate UIs — and open the newest `LangGraph` trace. Grafana shows you *that* a node
+Open `$LANGFUSE_HOST` (in the workshop, `https://jp.cloud.langfuse.com`) — mind the region, each one
+is a separate installation with its own UI. The workshop project is shared by the cohort, so filter by
+**User ID** = the email you logged in as, and open your newest `LangGraph` trace. Grafana shows you *that* a node
 was slow; Langfuse shows you *what the model was actually asked*:
 
 - The retrieved policy chunks from Part 2, verbatim, inside the worker's prompt — proof the RAG context
   reached the model rather than being assembled and dropped
 - The few-shot example from Part 3 appearing in later prompts once you have thumbed one up
 - Token counts per node, so you can see the ReAct loop's cost grow with each iteration
-- Failed provider calls as **ERROR** generations followed by the fallback attempt (Part 7)
+- Failed model calls as **ERROR** generations followed by the fallback attempt (Part 7)
 - `userId` and `sessionId` on every trace, so you can filter one employee's whole history
 
 Then open **Analytics** in the app header for the product-level view: conversation volume, category
