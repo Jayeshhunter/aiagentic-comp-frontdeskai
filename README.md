@@ -11,7 +11,7 @@ Skills, LLM provider, and SMTP settings survive restarts.
 
 | Doc | Use it when you want to… |
 |---|---|
-| **[participant-instructions.md](participant-instructions.md)** | Deploy it — your Kubernetes namespace (workshop), Codespace, or local; troubleshooting |
+| **[participant-instructions.md](participant-instructions.md)** | Deploy it — your Kubernetes namespace (workshop); Codespace or local after the course; troubleshooting |
 | **[use-case-scenarios.md](use-case-scenarios.md)** | **Experience it** — a guided tour, in order, over the seeded demo data |
 | **[user-manual.md](user-manual.md)** | Use it — what to type in chat as an employee or admin |
 | **[observability.md](observability.md)** | Read the metrics, spans, logs, and Grafana dashboard |
@@ -38,7 +38,7 @@ echo "https://$APP_HOST"              # your app URL, served by the Ingress in y
 It pulls the published `brainupgrade/frontdeskai` image (amd64 + arm64) and wires the app to your own
 gateway key. See [participant-instructions.md](participant-instructions.md#option-a-your-kubernetes-namespace-workshop).
 
-**Optional: GitHub Codespace or your own machine.** This needs a LiteLLM gateway that is reachable from
+**GitHub Codespace or your own machine (not part of the workshop).** This needs a LiteLLM gateway that is reachable from
 there. The workshop gateway is internal to the cluster, so it is not.
 
 ```bash

@@ -20,7 +20,7 @@ The app is then live at `https://$APP_HOST` through the Ingress in the participa
 keys come from the terminal environment when `.env` leaves them empty (a `.env` value wins). Details in the
 Spark section below.
 
-### Codespace / kind (optional)
+### Codespace / kind (out of scope for the workshop; kept for after-course use)
 
 ```bash
 cp .env.example .env          # set LITELLM_BASE_URL and LITELLM_API_KEY

@@ -7,8 +7,8 @@ Groq or other vendor key.
 | Option | Where the app runs | LLM | Your URL |
 |---|---|---|---|
 | **A. Your Kubernetes namespace** (the workshop path) | Your own namespace on the workshop cluster | Already set in your sandbox | `https://$APP_HOST` |
-| **B. GitHub Codespace** (optional) | A kind cluster inside the Codespace | You supply a gateway URL and key | Forwarded port 8000 |
-| **C. Your own machine** | kind, or plain Python | You supply a gateway URL and key | http://localhost:8000 |
+| **B. GitHub Codespace** (not part of this workshop) | A kind cluster inside the Codespace | You supply a gateway URL and key | Forwarded port 8000 |
+| **C. Your own machine** (not part of this workshop) | kind, or plain Python | You supply a gateway URL and key | http://localhost:8000 |
 
 ---
 
@@ -116,11 +116,12 @@ If you switched to another model in admin chat, switch back: `switch to qwen36-3
 
 ---
 
-## Option B: GitHub Codespace (optional)
+## Option B: GitHub Codespace (not part of this workshop)
+
+> **Out of scope for this workshop.** Use Option A. This section is kept for use after the course.
 
 The app runs in a kind cluster inside the Codespace. **You need a LiteLLM gateway that can be reached from
 the internet.** The workshop gateway is internal to the workshop cluster, so a Codespace cannot reach it.
-Ask your trainer for a URL and key if one is provided.
 
 **1. Save the gateway as Codespaces secrets.** On GitHub, go to **Settings → Codespaces → Secrets → New
 secret** and scope each secret to this repo:
@@ -147,7 +148,9 @@ the app runs only in kind, so deploy it with the scripts rather than `python app
 
 ---
 
-## Option C: Your own machine
+## Option C: Your own machine (not part of this workshop)
+
+> **Out of scope for this workshop.** Use Option A.
 
 The gateway must be reachable from your machine.
 
