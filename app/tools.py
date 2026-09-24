@@ -890,6 +890,39 @@ def get_expense_status(claim_id: str) -> str:
 
 
 @tool
+def list_my_expense_claims() -> str:
+    """List every expense claim the current employee has submitted, with status, review and payment dates."""
+    from auth import current_user_email
+    employee_id = current_user_email.get().split("@")[0]
+    conn = _get_db()
+    try:
+        rows = conn.execute(
+            "SELECT claim_id, amount, currency, category, description, status, "
+            "submitted_at, reviewed_at, rejection_reason, paid_at "
+            "FROM expense_claims WHERE employee_id = ? ORDER BY submitted_at DESC",
+            (employee_id,),
+        ).fetchall()
+        if not rows:
+            return f"No expense claims found for '{employee_id}'."
+
+        lines = [f"Expense claims for {employee_id} ({len(rows)} total):"]
+        for r in rows:
+            line = (f"  {r['claim_id']}: {r['currency']} {r['amount']:,.2f} {r['category']} — "
+                    f"{r['description']} — {r['status']} (submitted {r['submitted_at']}")
+            if r["reviewed_at"]:
+                line += f", reviewed {r['reviewed_at']}"
+            if r["paid_at"]:
+                line += f", paid {r['paid_at']}"
+            line += ")"
+            if r["rejection_reason"]:
+                line += f" Rejection reason: {r['rejection_reason']}"
+            lines.append(line)
+        return "\n".join(lines)
+    finally:
+        conn.close()
+
+
+@tool
 def submit_expense_claim(amount: float, category: str, description: str, receipt_count: int = 1) -> str:
     """Submit a new expense reimbursement claim for the current employee. category: travel/meals/software/hardware/training/office_supplies/other."""
     from auth import current_user_email
@@ -2020,7 +2053,7 @@ HR_TOOLS = [
 # Tools available to the manager agent — approve escalated leave requests
 MANAGER_TOOLS = [get_leave_balance_from_hr_system, approve_leave_via_mcp]
 TECH_TOOLS = [create_ticket, get_ticket_status, list_my_tickets]
-FINANCE_TOOLS = [get_expense_status, submit_expense_claim, approve_expense_claim, get_payslip]
+FINANCE_TOOLS = [get_expense_status, list_my_expense_claims, submit_expense_claim, approve_expense_claim, get_payslip]
 FACILITIES_TOOLS = [check_room_availability, book_meeting_room]
 
 from skills import SKILL_ADMIN_TOOLS

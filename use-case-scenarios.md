@@ -48,7 +48,25 @@ trail accumulates for the whole conversation thread, so the newest entries are a
 ## Part 1 — Routing: One Box, Eight Specialists
 
 There is no menu and no category picker. A supervisor LLM reads each message, classifies it, and scores
-its own confidence. Send these back to back **as `rajesh.kumar@unigps.in`** and watch the badge change:
+its own confidence. Log in **as `rajesh.kumar@unigps.in`**.
+
+### The confidence gate — send this first
+
+Make this the **first message you send** in the app. The gate is judged against your conversation so far,
+so it only shows on a thread that is still empty:
+
+```
+it's not working
+```
+
+**What to observe:** the supervisor scores this below 5, so the graph routes to the **clarify** node
+instead of guessing a department. The audit trail shows `Clarification requested`, and you get a
+follow-up question rather than a confidently wrong answer. This is the single most under-appreciated
+agentic behaviour in the app — knowing when *not* to act.
+
+### One box, four departments
+
+Now send these back to back and watch the badge change:
 
 ```
 My laptop screen is flickering when it runs on battery
@@ -58,8 +76,13 @@ How much casual leave do I have left?
 ```
 
 **What to observe:** four different badges (TECH, FINANCE, FACILITIES, HR) with no change in how you
-phrased things. The first two route through RAG and few-shot retrieval before reaching their worker;
-check the audit trail for retrieval entries.
+phrased things. All four route through RAG and few-shot retrieval before reaching their worker, and each
+worker then calls a tool on your own record: a new ticket, your two travel claims, the day's room
+bookings, your leave balance. Check the audit trail for the retrieval and tool entries.
+
+Now send `it's not working` a second time. It goes to **TECH**, not the clarify node: the laptop
+message is now in the conversation, so the supervisor knows what "it" is. Same words, different
+decision, because of the context.
 
 ### Routing Flow Diagram
 
@@ -82,18 +105,6 @@ flowchart TD
     M --> L
     G --> N[Response + Audit Trail]
 ```
-
-### The confidence gate
-
-Now send something genuinely vague:
-
-```
-it's not working
-```
-
-**What to observe:** the supervisor scores this below 5, so the graph routes to the **clarify** node
-instead of guessing a department. You get a follow-up question rather than a confidently wrong answer.
-This is the single most under-appreciated agentic behaviour in the app — knowing when *not* to act.
 
 ### Context across turns
 

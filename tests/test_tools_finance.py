@@ -138,3 +138,47 @@ class TestGetPayslip:
         result = get_payslip.invoke({"employee_id": "EMP001", "month": "2026-03"})
         assert "90000" in result or "gross" in result.lower()
         assert "18000" in result or "deduction" in result.lower()
+
+
+class TestListMyExpenseClaims:
+    def _as(self, employee_id):
+        from auth import current_user_email
+        return current_user_email.set(f"{employee_id}@test.com")
+
+    def test_lists_only_the_callers_claims_with_status(self, env):
+        import tools as t
+        from auth import current_user_email
+        from tools import list_my_expense_claims
+        db = sqlite3.connect(t.TOOLS_DB)
+        db.execute("""
+            INSERT OR IGNORE INTO employees
+                (employee_id, full_name, email, department, designation, date_of_join, is_active)
+            VALUES ('EMP002', 'Dan Other', 'dan@test.com', 'Finance', 'Analyst', '2022-01-01', 1)
+        """)
+        db.executemany(
+            "INSERT INTO expense_claims (claim_id, employee_id, amount, category, description, status, paid_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [("EXP-2026-0101", "EMP001", 4500, "travel", "Flight to Mumbai", "approved", None),
+             ("EXP-2026-0102", "EMP001", 2200, "travel", "Airport cab", "paid", "2026-02-20"),
+             ("EXP-2026-0103", "EMP002", 900, "meals", "Someone else's dinner", "submitted", None)],
+        )
+        db.commit()
+        db.close()
+        token = self._as("EMP001")
+        try:
+            result = list_my_expense_claims.invoke({})
+        finally:
+            current_user_email.reset(token)
+        assert "EXP-2026-0101" in result and "approved" in result
+        assert "EXP-2026-0102" in result and "2026-02-20" in result
+        assert "EXP-2026-0103" not in result
+
+    def test_no_claims(self, env):
+        from auth import current_user_email
+        from tools import list_my_expense_claims
+        token = self._as("EMP001")
+        try:
+            result = list_my_expense_claims.invoke({})
+        finally:
+            current_user_email.reset(token)
+        assert "no expense claims" in result.lower()
