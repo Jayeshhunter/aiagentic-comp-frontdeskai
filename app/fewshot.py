@@ -7,7 +7,7 @@ to incoming queries.
 
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+from rag import SingleSessionEmbeddingFunction
 
 from rag import CHROMA_DIR
 
@@ -23,7 +23,7 @@ _embed_fn = None
 def _get_embed_fn():
     global _embed_fn
     if _embed_fn is None:
-        _embed_fn = DefaultEmbeddingFunction()
+        _embed_fn = SingleSessionEmbeddingFunction()
     return _embed_fn
 
 

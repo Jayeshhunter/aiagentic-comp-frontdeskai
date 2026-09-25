@@ -32,3 +32,21 @@ calls, about three minutes.
 
 **Scores on qwen36-35b-a3b-lab, 2026-09-10:** before the HR identity-wording fix
 **10/16**, after **16/16**. The four failures were all under poisoned history.
+
+## `finance_worker_eval.py`
+
+Does the finance worker look up the caller's claims, or promise to and stop? Four
+requests × clean history and history after a tech ticket. Run it the same way.
+
+**Scores on the sandbox model, 2026-09-25:** before `list_my_expense_claims`
+**4/16**, after **16/16**.
+
+## `policy_over_history_eval.py`
+
+When an earlier reply and the retrieved policy disagree, does the worker answer from
+the policy? Part 2 of the tour edits a policy and asks again, so the earlier answer
+is still in the history. The Knowledge Base must hold the bundled `hr-handbook.md`.
+
+**Scores on the sandbox model, 2026-09-25:** with the policy placed before the
+history **3/6**, after it **6/6**. Replaying a real 20-message Part 2 conversation:
+**0/3** before, **4/4** after.

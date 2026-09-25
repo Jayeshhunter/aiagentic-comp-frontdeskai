@@ -769,8 +769,10 @@ def make_domain_worker(name: str, system_prompt: str, can_escalate: bool,
         SystemMessage(content=system_content),
         ("human",
          "{fewshot_context}\n\n"
+         "{history}\n\n"
+         # Policy after history: the current policy must be read after any earlier,
+         # possibly outdated reply, or the model repeats the reply (Part 2 KB edit).
          "{rag_context}\n\n"
-         "{history}\n"
          "Today is {today}. Resolve relative dates such as 'tomorrow' or 'next Monday' "
          "against it and pass tools absolute YYYY-MM-DD dates.\n"
          "Employee making this request — this is the caller, and every tool acts on "

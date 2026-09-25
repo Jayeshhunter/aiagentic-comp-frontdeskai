@@ -581,7 +581,9 @@ async def kb_upload(request: Request, file: UploadFile = File(...)):
         f.write(content)
 
     # Re-index all documents
-    chunk_count = index_documents(force=True)
+    # Re-embedding every policy takes ~90s at the 0.5-CPU limit; on the event loop
+    # it starves /health and the kubelet restarts the pod mid-upload.
+    chunk_count = await asyncio.to_thread(index_documents, force=True)
     obs.logger.info(
         "Knowledge base updated",
         extra={"doc_filename": safe_filename, "chunks": chunk_count, "admin": user},
@@ -607,7 +609,9 @@ async def kb_delete(request: Request, filename: str = Form(...)):
         raise HTTPException(status_code=404, detail="Document not found")
 
     os.remove(filepath)
-    chunk_count = index_documents(force=True)
+    # Re-embedding every policy takes ~90s at the 0.5-CPU limit; on the event loop
+    # it starves /health and the kubelet restarts the pod mid-upload.
+    chunk_count = await asyncio.to_thread(index_documents, force=True)
     obs.logger.info(
         "Knowledge base document deleted",
         extra={"doc_filename": safe_name, "chunks": chunk_count, "admin": user},

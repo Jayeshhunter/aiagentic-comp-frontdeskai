@@ -158,9 +158,21 @@ flowchart TD
 How much notice do I need to give for earned leave?
 ```
 
-The handbook says 7 days in advance. Then prove the grounding is real: as an admin, open **Knowledge
-Base** in the header, edit or upload a policy document, and ask again. The answer changes immediately —
-no rebuild, no restart, no re-index step.
+The handbook says 7 days in advance. Then prove the grounding is real by changing the policy:
+
+1. In JupyterLab, open `app/data/policies/hr-handbook.md` in your clone and change
+   `5 days without manager approval; 6–10 days` to `3 days without manager approval; 4–10 days`.
+   Save it, then right-click it in the file browser and **Download** it.
+2. Log in as `admin@unigps.in`, open **Knowledge Base** in the header, and upload the file. The same
+   name replaces the old handbook, and the page re-indexes every policy (about 15 seconds).
+3. Log back in as `rajesh.kumar@unigps.in` and ask the first question again.
+
+**What to observe:** the answer is now *3 days*, even though this conversation said 5 a minute ago —
+no rebuild, no restart, no re-index step. The worker reads the freshly retrieved policy *after* the
+conversation history, so the current policy beats its own earlier reply.
+
+Change the line back to `5 … 6–10`, save, download and upload it again, so later parts see the
+original policy.
 
 ---
 

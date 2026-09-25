@@ -8,10 +8,59 @@ import os
 import re
 import glob
 import hashlib
+from functools import cached_property
 
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+from chromadb.utils.embedding_functions.onnx_mini_lm_l6_v2 import ONNXMiniLM_L6_V2
+
+
+class _SingleThreadMiniLM(ONNXMiniLM_L6_V2):
+    """The default MiniLM model, run on one ONNX thread."""
+
+    @cached_property
+    def model(self):
+        so = self.ort.SessionOptions()
+        so.log_severity_level = 3
+        so.graph_optimization_level = self.ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        so.intra_op_num_threads = 1
+        so.inter_op_num_threads = 1
+        return self.ort.InferenceSession(
+            os.path.join(self.DOWNLOAD_PATH, self.EXTRACTED_FOLDER_NAME, "model.onnx"),
+            providers=["CPUExecutionProvider"],
+            sess_options=so,
+        )
+
+
+class SingleSessionEmbeddingFunction(EmbeddingFunction[Documents]):
+    """ChromaDB's default embedder with one ONNX session on one thread.
+
+    Same model, same "default" name and config, so collections indexed by earlier builds
+    still match. The stock one builds a new session on every call and gives it a thread
+    per host core — 20 on Spark, inside a 0.5-CPU quota — so re-indexing the policies
+    after a Knowledge Base upload took ~81s, against ~10s with this. It must not subclass
+    DefaultEmbeddingFunction: ChromaDB ignores any instance of that and embeds with a
+    fresh stock one.
+    """
+
+    def __init__(self) -> None:
+        self._ef = _SingleThreadMiniLM()
+
+    def __call__(self, input: Documents) -> Embeddings:
+        return self._ef(input)
+
+    @staticmethod
+    def name() -> str:
+        return "default"
+
+    def get_config(self) -> dict:
+        return {}
+
+    @staticmethod
+    def build_from_config(config: dict) -> "SingleSessionEmbeddingFunction":
+        return SingleSessionEmbeddingFunction()
+
 
 # Directories — policies live on writable storage (PVC), not inside the image
 _SQLITE_DIR = os.getenv("SQLITE_DIR", "/shared/.sqlite")
@@ -48,7 +97,7 @@ def _seed_policies():
 def _get_embed_fn():
     global _embed_fn
     if _embed_fn is None:
-        _embed_fn = DefaultEmbeddingFunction()
+        _embed_fn = SingleSessionEmbeddingFunction()
     return _embed_fn
 
 
