@@ -236,11 +236,10 @@ RAG answers questions. Tools change the world. As `rajesh.kumar@unigps.in`:
 ```
 What's my leave balance?
 ```
-→ The HR worker calls the **MCP** leave tool first (Part 9), so what you see comes from PostgreSQL: an
-employee it has never seen is provisioned with the standard entitlement — casual 12, sick 6, earned 15,
-WFH 24. Only if the MCP server is unreachable does it fall back to the app's own SQLite record (Rajesh
-is seeded there with casual 18, sick 8, earned 12, WFH 24). Either way, the agent supplied *your*
-identity to the tool from your session — you never typed it.
+→ Casual 18, sick 8, earned 12, WFH 24, from the app's own records (`get_leave_balance`). Rajesh is an
+app employee, so his leave lives here — the same balance that Part 11's manager approval deducts from.
+Only people who are not in the app (the HR-system roster in Part 9) are answered from PostgreSQL over
+MCP. Either way, the agent supplied *your* identity to the tool from your session — you never typed it.
 
 ```
 Show me my payslip for January 2026
@@ -640,8 +639,9 @@ workshop namespace).
 Other MCP-backed identities: `bob` (HR, pending wedding leave), `carol` (Finance), `dave` (DevOps, one
 rejected holiday request). Ask `how much leave have I used this year?` as `alice` — she has approved
 casual, sick, earned, and WFH requests on record. Ask as an app employee such as `rajesh.kumar` and the
-MCP server provisions them on the spot with the standard entitlement (12/6/15/24), which is why Part 4's
-balance comes back as the default rather than the SQLite seed.
+answer comes from the app, not MCP: his leave lives in the app, where his manager decides it (Part 11).
+Both MCP tools refuse an app employee — in the tool, not the prompt — because the MCP server would
+otherwise provision a default record (12/6/15/24), a second balance that contradicts the real one.
 
 ### The manager writes back
 
@@ -742,7 +742,7 @@ easy to confuse:
 | Shape | Where | What the human supplies |
 |---|---|---|
 | **Ask before acting** | the clarify node (Part 1) | the missing information |
-| **Stop and hand over** | leave over 3 days, expense approval | the *decision* |
+| **Stop and hand over** | leave over 5 days, expense approval | the *decision* |
 | **Curate afterwards** | 👍/👎 (Part 3), Knowledge Base (Part 2) | the judgement about what was good |
 
 The middle one is the interesting one, because it is the only place where the agent holds a tool that
@@ -760,39 +760,46 @@ sequenceDiagram
     participant A as HR agent
     participant DB as leave_requests
     participant M as Arjun (his manager)
-    E->>A: I need 7 days casual leave
-    A->>DB: apply_leave — over 3 days, so pending
-    A-->>E: Request #8 filed, awaiting your manager
+    E->>A: I need 7 days casual leave, 9-15 Nov
+    A->>DB: apply_leave — over 5 days, so pending
+    A-->>E: Request #6 filed, awaiting your manager
+    Note over E,DB: balance unchanged (15 casual) until someone decides
     M->>A: anything pending from my team?
     A->>DB: list_pending_leave_requests (manager_id = arjun)
-    A-->>M: Request #8 — Rajesh, 7 days, 12-18 Oct
-    M->>A: approve request #8
+    A-->>M: #5 (Part 5, 15 days) and #6 — Rajesh, 7 days, 9-15 Nov
+    M->>A: approve request #6
     A->>DB: approve_leave_request — authority checked, balance deducted
-    A-->>M: Approved. Rajesh has 10 casual days left
+    A-->>M: Approved. Rajesh has 8 casual days left
     E->>A: what is the status of my request?
     A->>DB: list_my_leave_requests
-    A-->>E: Request #8 approved by Arjun Nayak
+    A-->>E: #6 approved by Arjun Nayak (#5 still pending)
 ```
 
 **Turn 1 — the employee asks.** As `rajesh.kumar@unigps.in`:
 
 ```
-I need 7 days of casual leave from 2026-10-12 to 2026-10-18 for a family function
+I need 7 days of casual leave from 2026-11-09 to 2026-11-15 for a family function
 ```
 
-Measured reply: *"Your casual leave request #8 for 7 days … has been submitted and is awaiting manager
-approval. Please quote request #8 if you need to check the status later."*
+Measured reply, after Parts 4 and 5: *"Your 7-day casual leave request from November 9 to 15, 2026 … has
+been submitted for manager approval (Request #6). Since this exceeds the 5-day limit without prior
+approval, your manager will review it."*
 
-⚠️ **Your number will not be 8.** Request ids are sequential from the four seeded rows, so it depends on
-how many have been filed on that database — the run that produced these quotes got #8 and the very next
-run on the same database got #9. Turns 3 and 4 below say `#8`; **use the number you were actually
-given.** The number matters more than it looks: before `apply_leave` returned one, the model **invented**
+⚠️ **Your number may not be 6.** Request ids are sequential after the three seeded rows: Part 4's 3-day
+request took #4 and Part 5's 15-day request #5, so skip those and you get #4. Turns 3 and 4 below say
+`#6`; **use the number you were actually given.** The dates are chosen to clear Part 5's request (28 Sep
+to 12 Oct) — `apply_leave` refuses a request that overlaps one already pending or approved. The number
+matters more than it looks: before `apply_leave` returned one, the model **invented**
 a plausible id (`#7892`, against a row that was `#7`) because it had nothing real to quote.
 
 **What to observe:** the request number, and the fact that the balance did **not** move. Ask
-`what is my leave balance?` — still 17 casual days, with the seven listed separately as pending. The
-agent is holding the decision open on behalf of a human, and is careful not to spend the balance in the
-meantime. Anything up to three days would have been approved on the spot; over that, the tool files it.
+`what is my leave balance?` — still 15 casual days (18, less Part 4's three), with the 7-day and 15-day
+requests listed separately as pending. The agent is holding the decision open on behalf of a human, and
+is careful not to spend the balance in the meantime. Up to five days would have been approved on the
+spot, as the handbook allows; over that, the tool files it.
+
+⚠️ The reply may add *"You'll be notified once a decision is made."* There is no notification — see
+the note after Turn 4.
 
 **Turn 2 — the manager asks what is waiting.** Log out, log in as `arjun.nayak@unigps.in` — Rajesh's
 manager in the `employees` table:
@@ -801,8 +808,9 @@ manager in the `employees` table:
 Are there any pending leave requests from my team?
 ```
 
-Measured reply: *"There is one pending leave request from your team: Request #8 from Rajesh Kumar for 7
-days of casual leave from 2026-10-12 to 2026-10-18."*
+Measured reply: *"There are two pending leave requests from your team: Request #5: Rajesh Kumar … 15
+days of casual leave from September 28 to October 12 … Request #6: Rajesh Kumar … 7 days of casual leave
+from November 9 to November 15."* Only #6 if you skipped Part 5.
 
 **What to observe:** the manager never said whose requests, or named a team. `list_pending_leave_requests`
 takes **no arguments** — it resolves the team from `employees.manager_id` using the session identity, so
@@ -814,11 +822,11 @@ seeded Goa request, #3, with no setup at all.
 **Turn 3 — the manager decides.** Still as Arjun:
 
 ```
-Approve leave request #8
+Approve leave request #6
 ```
 
-Measured reply: *"Leave request #8 for Rajesh Kumar has been successfully approved … their remaining
-casual leave balance is 10 days."* The days are deducted **now**, at the decision, not when the request
+Measured reply: *"Leave request #6 for Rajesh Kumar's 7-day casual leave (Nov 9–15, 2026) has been
+approved. His remaining casual leave balance is now 8 days."* The days are deducted **now**, at the decision, not when the request
 was filed — and the balance is re-checked at that moment, so a request that was affordable in October
 is refused in December if the days have been spent since.
 
@@ -843,7 +851,8 @@ and are read from the `employees` table by the tool, never from the conversation
 What is the status of my leave request?
 ```
 
-Measured reply: *"Request #8 for 7 days of casual leave … has been approved by Arjun Nayak."* The
+Measured reply: *"… Request #6 (7 days, Nov 9–15) was approved today by your manager, Arjun Nayak."*
+It lists #4 and the still-pending #5 alongside. The
 employee learns who decided, not just what was decided. Verify the row independently:
 
 ```bash
@@ -973,11 +982,14 @@ kubectl exec deployment/frontdeskai -- python -c \
 Part 5's escalation is the trap. A 15-day leave request sets `needs_escalation`, the graph diverts
 through the **manager** node, and the audit trail says `Hr worker: escalating`. It reads like a handover
 to a person. It is not — the manager node is another LLM with its own prompt and its own tools, and in
-Part 9 it reads a balance and writes an approval to the HR database without a human seeing it.
+Part 9 it reads a balance and writes an approval to the HR database without a human seeing it — for
+Alice, who exists only in that HR system. For Rajesh it cannot: both MCP tools refuse an app employee,
+so the most it can do is read his balance from the app and explain. Nothing is written, and request #5
+stays pending for Arjun.
 
 Calling a node "manager" does not put a human in the loop. The test is not what the node is named or
 what the trail says; it is whether the system can complete the action without a person. By that test
-this app has exactly two human gates — expense approval, and local leave over three days — and both of
+this app has exactly two human gates — expense approval, and local leave over five days — and both of
 them are enforced in a tool, not in a prompt.
 
 ### What a full implementation would add

@@ -166,10 +166,11 @@ POST carries the call and returns an SSE-formatted response, no session handshak
 [`mcp/mcp-postgre/design.html`](mcp/mcp-postgre/design.html).
 
 It writes as well as reads: `approve_leave` records an approved request and deducts the days atomically,
-and the escalation **manager** node calls it through `approve_leave_via_mcp`, so a leave request over the
-policy limit is settled by a write into that remote database. Employee ids the server has not seen are
-auto-provisioned with the default entitlement (12 casual / 6 sick / 15 earned / 24 WFH), which is why an
-app employee's balance comes from PostgreSQL rather than the app's own SQLite seed.
+and the escalation **manager** node calls it through `approve_leave_via_mcp`, so an HR-system employee's
+leave request over the policy limit is settled by a write into that remote database. The server
+auto-provisions employee ids it has not seen (12 casual / 6 sick / 15 earned / 24 WFH), so both MCP
+tools refuse an **app** employee: their leave lives in the app's own SQLite, where their own manager
+decides it, and a provisioned record would be a second, contradictory balance.
 
 ## Configuration
 

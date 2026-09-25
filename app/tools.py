@@ -552,8 +552,9 @@ def apply_leave(leave_type: str, start_date: str, end_date: str, reason: str = "
                 f"Please cancel it first or choose different dates."
             )
 
-        # Auto-approve <= 3 days, otherwise pending for manager approval
-        auto_approve = days <= 3
+        # Auto-approve up to 5 days (hr-handbook.md: 5 consecutive days without manager
+        # approval), otherwise pending for manager approval
+        auto_approve = days <= 5
         status = "approved" if auto_approve else "pending"
 
         cur = conn.execute(
@@ -579,7 +580,7 @@ def apply_leave(leave_type: str, start_date: str, end_date: str, reason: str = "
             result = (
                 f"Leave request #{request_id} submitted for manager approval: {days} day(s) of "
                 f"{leave_type} leave from {start_date} to {end_date}.\n"
-                f"Requests of more than 3 days require manager approval. Quote request "
+                f"Requests of more than 5 days require manager approval. Quote request "
                 f"#{request_id} when you ask about it."
             )
 
@@ -1924,18 +1925,41 @@ def _mcp_employee_id() -> str | None:
     return None if employee_id in ("", "unknown") else employee_id
 
 
+def _app_employee_name(employee_id: str) -> str | None:
+    """The full name if this person is an employee of this app, else None.
+
+    An app employee's leave lives in this app's own tables: their balance, their
+    requests, and the manager who decides them. The HR system (MCP) holds a
+    different roster. Asked about an app employee it provisions a default record,
+    which is a second, wrong balance -- and an approval written there would bypass
+    the manager who is supposed to decide.
+    """
+    conn = _get_db()
+    try:
+        row = conn.execute(
+            "SELECT full_name FROM employees WHERE employee_id = ? AND is_active = 1",
+            (employee_id,),
+        ).fetchone()
+        return row["full_name"] if row else None
+    finally:
+        conn.close()
+
+
 @tool
 def get_leave_balance_from_hr_system() -> str:
     """Get the logged-in employee's leave balance from the HR system (PostgreSQL via MCP server).
 
-    This tool calls the remote HR MCP server which reads from the company's
-    PostgreSQL HR database — use this for accurate, real-time leave data. It
-    always reads the caller's own record; there is no way to target another
-    employee.
+    For HR-system employees only -- people who are not in this app's own records.
+    An app employee's balance comes from get_leave_balance. It always reads the
+    caller's own record; there is no way to target another employee.
     """
     employee_id = _mcp_employee_id()
     if not employee_id:
         return "Unable to determine your identity. Please log out and log back in."
+    name = _app_employee_name(employee_id)
+    if name:
+        return (f"{name} is an employee of this app, so their leave is kept here, not in the "
+                "HR system. Call get_leave_balance instead.")
 
     payload = json.dumps({
         "jsonrpc": "2.0",
@@ -1992,11 +2016,17 @@ def approve_leave_via_mcp(
     approved request, and deducts days — all atomically. The request is always
     recorded against the caller's own record; leave cannot be approved on someone
     else's behalf. leave_type must be one of: casual, sick, earned, wfh. Dates in
-    YYYY-MM-DD format.
+    YYYY-MM-DD format. For HR-system employees only: an app employee's leave is
+    filed with apply_leave and decided by their own manager.
     """
     employee_id = _mcp_employee_id()
     if not employee_id:
         return "Unable to determine your identity. Please log out and log back in."
+    name = _app_employee_name(employee_id)
+    if name:
+        return (f"Not recorded: {name} is an employee of this app, so their leave cannot be "
+                "decided in the HR system. It is filed with apply_leave and decided by their own "
+                "manager, who sees it with list_pending_leave_requests.")
 
     payload = json.dumps({
         "jsonrpc": "2.0",
@@ -2051,7 +2081,7 @@ HR_TOOLS = [
 ]
 
 # Tools available to the manager agent — approve escalated leave requests
-MANAGER_TOOLS = [get_leave_balance_from_hr_system, approve_leave_via_mcp]
+MANAGER_TOOLS = [get_leave_balance_from_hr_system, approve_leave_via_mcp, get_leave_balance]
 TECH_TOOLS = [create_ticket, get_ticket_status, list_my_tickets]
 FINANCE_TOOLS = [get_expense_status, list_my_expense_claims, submit_expense_claim, approve_expense_claim, get_payslip]
 FACILITIES_TOOLS = [check_room_availability, book_meeting_room]

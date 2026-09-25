@@ -366,3 +366,66 @@ class TestListMyLeaveRequests:
             from auth import current_user_email
             current_user_email.reset(token)
         assert "no leave requests" in out.lower()
+
+
+# ---------------------------------------------------------------------------
+# The handbook's threshold, and which system holds an app employee's leave
+# ---------------------------------------------------------------------------
+
+def _apply_as_emp001(start, end):
+    from tools import apply_leave
+    from auth import current_user_email
+    token = _as("EMP001")
+    try:
+        return apply_leave.invoke({"leave_type": "casual", "start_date": start,
+                                   "end_date": end, "reason": "Family function"})
+    finally:
+        current_user_email.reset(token)
+
+
+class TestHandbookThreshold:
+    """hr-handbook.md: 'Maximum consecutive: 5 days without manager approval'."""
+
+    def test_five_days_are_approved_outright(self, team):
+        result = _apply_as_emp001("2026-07-06", "2026-07-10")
+        assert "approved" in result.lower()
+        assert _balance() == 5
+
+    def test_six_days_wait_for_the_manager(self, team):
+        result = _apply_as_emp001("2026-07-06", "2026-07-11")
+        assert "manager approval" in result.lower()
+        assert _balance() == 10
+
+
+class TestAppEmployeesStayOutOfTheHrSystem:
+    """An app employee's leave lives in this app. The MCP tools must not read a
+    provisioned default for them, or approve behind their manager's back."""
+
+    def _no_network(self, monkeypatch):
+        import urllib.request
+        def boom(*a, **k):
+            raise AssertionError("the HR system must not be called for an app employee")
+        monkeypatch.setattr(urllib.request, "urlopen", boom)
+
+    def test_balance_from_hr_system_points_to_the_app(self, team, monkeypatch):
+        from tools import get_leave_balance_from_hr_system
+        from auth import current_user_email
+        self._no_network(monkeypatch)
+        token = _as("EMP001")
+        try:
+            out = get_leave_balance_from_hr_system.invoke({})
+        finally:
+            current_user_email.reset(token)
+        assert "get_leave_balance" in out
+
+    def test_approve_via_mcp_refuses_an_app_employee(self, team, monkeypatch):
+        from tools import approve_leave_via_mcp
+        from auth import current_user_email
+        self._no_network(monkeypatch)
+        token = _as("EMP001")
+        try:
+            out = approve_leave_via_mcp.invoke({"leave_type": "casual", "start_date": "2026-07-06",
+                                               "end_date": "2026-07-20", "reason": "x"})
+        finally:
+            current_user_email.reset(token)
+        assert out.startswith("Not recorded") and "own manager" in out

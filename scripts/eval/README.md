@@ -50,3 +50,15 @@ is still in the history. The Knowledge Base must hold the bundled `hr-handbook.m
 **Scores on the sandbox model, 2026-09-25:** with the policy placed before the
 history **3/6**, after it **6/6**. Replaying a real 20-message Part 2 conversation:
 **0/3** before, **4/4** after.
+
+## `leave_source_eval.py`
+
+Does a balance question read the system that holds that person's leave? `rajesh.kumar`
+(app employee) must end on `get_leave_balance`; `alice` (HR-system only) on
+`get_leave_balance_from_hr_system`. Needs the MCP Leave Service, as `deploy-spark.sh`
+sets up. It skips policy retrieval, so it fits next to the app inside the 1Gi pod —
+the retrieval-loading evals above can push the pod over its limit when the app is busy.
+
+**Scores on the sandbox model, 2026-09-25:** with MCP as the primary balance read
+**4/8** (both Rajesh cases ended on the HR system's provisioned 12/6/15/24), after
+**8/8**.
