@@ -112,7 +112,7 @@ mcp/                MCP Leave Service — PostgreSQL manifests + FastMCP server
 scripts/            deploy.sh, deploy-mcp.sh, manifests/, observability/
 ```
 
-## Dynamic Skills — The Self-Teaching Engine
+## Dynamic Skills — Self-Extension
 
 ```
 Admin: "Install a weather lookup skill"

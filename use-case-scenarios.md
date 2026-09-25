@@ -516,7 +516,7 @@ Gmail account use an App Password, not your login password.
 
 ---
 
-## Part 8 — The Self-Teaching Loop (admin only)
+## Part 8 — Self-Extension: The Agent Writes Its Own Tools (admin only)
 
 This is the centrepiece. The system does not have a weather capability. Ask it to build one:
 
@@ -1015,7 +1015,7 @@ the conversation reaches it.
 | 10 min | 4 | Tools — reading and writing real state, multi-step from one sentence |
 | 10 min | 5 | Guardrails — escalation, PII, unfakeable identity, authority in the database |
 | 5 min | 6 | Analytics and account — business questions without a dashboard |
-| 15 min | 7–8 | Self-configuration and the self-teaching loop — **the reason this app exists** |
+| 15 min | 7–8 | Self-configuration and self-extension — **the reason this app exists** |
 | 5 min | 9–10 | MCP reads *and writes*, then Langfuse to read the actual prompts |
 | 5 min | 11 | Human in the loop — the two decisions the agent is not allowed to make |
 

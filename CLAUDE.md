@@ -219,7 +219,7 @@ Note: All runtime configuration is managed through chat (stored in `system_confi
 1. **Zero-downtime via admin chat** — login as admin and say `update ollama api key to <key>`; the `skill_admin` worker saves it to DB and hot-reloads immediately.
 2. **Script** — `bash scripts/update-secret.sh` reads all keys from `.env`, patches the K8s secret, and restarts the pod.
 
-## Agentic Loop (Self-Teaching)
+## Agentic Skill Authoring (Self-Extension)
 
 The full agentic cycle for adding a new capability, entirely via chat:
 1. **Research** — `search_web` + `fetch_webpage` to discover APIs/approaches

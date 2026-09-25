@@ -95,7 +95,7 @@ Send an email to alice@company.com about her leave approval
 
 Passwords are encrypted at rest. If `SECRET_KEY` is rotated, re-run `configure_smtp`.
 
-### Skills — Self-Teaching
+### Skills — Self-Extension
 
 ```
 Install a skill to check stock prices
