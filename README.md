@@ -16,7 +16,7 @@ Skills, LLM provider, and SMTP settings survive restarts.
 | **[user-manual.md](user-manual.md)** | Use it — what to type in chat as an employee or admin |
 | **[observability.md](observability.md)** | Read the metrics, spans, logs, and Grafana dashboard |
 | **[langfuse-setup.md](langfuse-setup.md)** | Wire up LLM-level tracing with Langfuse |
-| **[skills/oci_compute.md](skills/oci_compute.md)** · **[feature/ociconnectivity.md](feature/ociconnectivity.md)** | The shipped OCI skill and its design |
+| **[skills/fx_expense.md](skills/fx_expense.md)** | The shipped skill: foreign-currency expenses |
 
 ## Quick Start
 
@@ -131,20 +131,18 @@ Employee: "What's the weather in Mumbai?"
 
 A skill is a standalone Python file: a `SKILL_META` dict (`name`, `description`, `categories` — which
 domain workers receive the tool — and `config_keys`), plus `@tool` functions that read their config via
-`skill_config(skill_name, key)`. See `skills/oci_compute.py` for a complete example.
+`skill_config(skill_name, key)`. See `skills/fx_expense.py` for a complete example.
 
 **Skill admin tools:** `search_web`, `fetch_webpage`, `install_skill`, `list_skills`, `set_skill_config`,
 `get_skill_config`, `get_llm_config`, `change_llm_model`, `configure_fallback_llm`, `configure_smtp`,
 `get_smtp_config`, `send_email`. For the phrasing that triggers each, see [user-manual.md](user-manual.md).
 
-**Shipped skill — `oci_compute`:** OCI compute self-service for the `tech` and `skill_admin` workers
-(list, inspect, softreset/stop/start, launch, terminate). Launch and terminate are admin-gated. All OCI
-credentials, including the API private key, are set through admin chat and stored encrypted — no
-Kubernetes Secret or `~/.oci/config` mount. Install:
+**Shipped skill — `fx_expense`:** converts a foreign-currency expense to INR at the ECB rate for the expense
+date, for the `finance` worker. No API key. Install:
 
 ```bash
-kubectl cp skills/oci_compute.py \
-  $(kubectl get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/shared/.frontdeskai/skills/oci_compute.py
+kubectl cp skills/fx_expense.py \
+  $(kubectl get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/shared/.frontdeskai/skills/fx_expense.py
 kubectl rollout restart deployment/frontdeskai
 ```
 
@@ -277,7 +275,7 @@ flowchart TD
 
     %% Few-shot routes to 4 domain workers
     fewshot_retrieval -->|hr| hr_worker[hr_worker<br/>Leave, HR Tools + ReAct]
-    fewshot_retrieval -->|tech| tech_worker[tech_worker<br/>Tickets, OCI + ReAct]
+    fewshot_retrieval -->|tech| tech_worker[tech_worker<br/>Tickets + ReAct]
     fewshot_retrieval -->|finance| finance_worker[finance_worker<br/>Expenses, Payslips + ReAct]
     fewshot_retrieval -->|facilities| facilities_worker[facilities_worker<br/>Rooms, Booking + ReAct]
 

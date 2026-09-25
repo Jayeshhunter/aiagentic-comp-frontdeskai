@@ -574,11 +574,6 @@ WORKER_CONFIGS = {
             "- Employee asks to list their tickets → call list_my_tickets (takes no arguments).\n"
             "Never pass an employee_id — every tool resolves the caller's identity from the session.\n"
             "Do NOT just describe the process — create the ticket when asked.\n\n"
-            "OCI COMPUTE (if oci_* tools are available):\n"
-            "- Employee asks to list/view OCI instances → call oci_list_instances(lifecycle_state)\n"
-            "- Employee asks about a specific instance → call oci_get_instance(instance_id)\n"
-            "- Employee asks to restart/stop/start an instance → call oci_instance_action(instance_id, action)\n"
-            "Always call the OCI tool directly — do NOT describe it or write the tool name in brackets.\n\n"
             "Escalate if: P1 severity (production down, data loss, security breach)."
         ),
         "can_escalate": True,

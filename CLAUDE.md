@@ -269,7 +269,7 @@ get_leave_balance_from_hr_system  ──────→  FastMCP · streamable-h
 | `scripts/install-observability.sh` | Install Prometheus, Grafana, Loki, Promtail, Tempo via Helm into `monitoring` namespace |
 | `scripts/update-observability.sh` | Update one component without a full reinstall — `grafana`, `dashboard`, `prometheus`, `loki`, `promtail`, `tempo`, or no arg for everything |
 | `scripts/generate-test-traffic.sh` | Generate load to populate observability dashboards |
-| `skills/oci_compute.py` | OCI compute self-service skill (git-tracked source; `kubectl cp` it to `/shared/.frontdeskai/skills/` to install) |
+| `skills/fx_expense.py` | Foreign-currency expense skill (git-tracked source; `kubectl cp` it to `/shared/.frontdeskai/skills/` to install) |
 | `scripts/manifests/deployment.yaml` | App deployment (image: `frontdeskai:latest`, imagePullPolicy: Never for kind) + `MCP_LEAVE_URL` env |
 | `scripts/manifests/service.yaml` | NodePort service — http(80→30800), metrics(9090→30900) |
 | `scripts/manifests/secret.yaml` | Secret template — `SECRET_KEY`, `AUTH_PASSWORD`, `LLM_PROVIDER`, `LLM_MODEL`, `LITELLM_*`, empty fallback, optional Langfuse keys |

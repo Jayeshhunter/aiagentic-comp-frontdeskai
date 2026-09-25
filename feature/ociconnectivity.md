@@ -10,7 +10,7 @@ All OCI credentials are configured at runtime via admin chat and stored encrypte
 
 | Skill | State | Source |
 |-------|-------|--------|
-| `oci_compute` | **Built** — ships in the repo | [`skills/oci_compute.py`](../skills/oci_compute.py), reference in [`skills/oci_compute.md`](../skills/oci_compute.md) |
+| `oci_compute` | **Removed** 2026-09-25 | Source in git history |
 | `oci_support` | **Designed, not built** | Plan: [`todo/oci_support_skill.md`](../todo/oci_support_skill.md) |
 | `oci_finance` | **Designed, not built** | Plan: [`todo/oci_finance_skill.md`](../todo/oci_finance_skill.md) |
 
@@ -207,11 +207,11 @@ Employee: "Compare Q1 vs Q4 compute spend"
 
 ---
 
-### 3. `oci_compute_skill` — Developer VM Self-Service _(built)_
+### 3. `oci_compute_skill` — Developer VM Self-Service _(removed)_
 
 **Worker:** `tech`, `skill_admin`  
 **OCI Service:** Core Compute  
-**Source:** [`skills/oci_compute.py`](../skills/oci_compute.py) — see [`skills/oci_compute.md`](../skills/oci_compute.md) for the full reference
+**Source:** removed from the repo on 2026-09-25; recover `skills/oci_compute.py` from git history
 
 #### Tools
 
@@ -288,11 +288,11 @@ Admin: "Provision a 4-OCPU 32GB instance named 'new-hire-dev' for Priya"
 
 OCI skills are installed at runtime — no image rebuild or redeployment required.
 
-### Method 1 — Copy onto the PVC (how `oci_compute` ships)
+### Method 1 — Copy onto the PVC
 
 ```bash
-kubectl cp skills/oci_compute.py \
-  $(kubectl get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/shared/.frontdeskai/skills/oci_compute.py
+kubectl cp skills/<name>.py \
+  $(kubectl get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/shared/.frontdeskai/skills/<name>.py
 kubectl rollout restart deployment/frontdeskai
 ```
 

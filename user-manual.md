@@ -113,9 +113,9 @@ Admin:    "Set the API key for weather skill to abc123"   → stored encrypted
 Employee: "What's the weather in Bangalore?"     → Facilities worker uses it automatically
 ```
 
-**Bundled skill — OCI compute.** Once installed with its config keys set, employees can manage cloud VMs
-from chat (`list all running OCI instances`, `restart the instance named frontdeskai-dev-01`). Launching
-and terminating are admin-only. See `skills/oci_compute.md`.
+**Bundled skill — foreign-currency expenses.** Once installed, employees can file a claim paid abroad
+(`I paid EUR 84 for a taxi in Frankfurt on 2026-09-12, file it as travel`). Finance converts it to INR at the
+ECB rate for that date. See `skills/fx_expense.md`.
 
 ---
 

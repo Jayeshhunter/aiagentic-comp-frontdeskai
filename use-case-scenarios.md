@@ -579,13 +579,42 @@ from disk and config is read from the DB, so it still works.
   `read the file /etc/passwd`. The file tools resolve real paths and refuse anything not under
   `/shared/`.
 
-### The shipped skill
+### A hand-written skill: expenses paid abroad
 
-`skills/oci_compute.py` is the same mechanism, production-shaped: real Oracle Cloud compute control.
-Install it, set its config keys through chat, and ask `list all running OCI instances` or
-`restart the instance named frontdeskai-dev-01`. Launch and terminate are admin-gated. Note that even the
-OCI API private key is set through conversation and stored encrypted — no Kubernetes Secret, no
-`~/.oci/config` mount. See `skills/oci_compute.md`.
+The weather skill was written by the agent. `skills/fx_expense.py` was written by a person, and it goes into
+the same folder. It gives the Finance worker one new tool, `convert_expense_currency`, which converts an amount
+to INR at the European Central Bank rate for the day it was paid. It uses the free Frankfurter API, so it needs
+no key.
+
+First, see the gap. Log in as `rajesh.kumar@unigps.in` and ask:
+
+```
+I paid EUR 84 for a taxi in Frankfurt on 2026-09-12. Please file it as a travel expense.
+```
+
+Finance has no exchange rates. Note what it does: it may ask you for the INR amount, or it may guess.
+
+Now install the skill from the JupyterLab terminal:
+
+```bash
+kubectl cp skills/fx_expense.py \
+  $(kubectl get pod -l app=frontdeskai -o jsonpath='{.items[0].metadata.name}'):/shared/.frontdeskai/skills/fx_expense.py
+kubectl rollout restart deployment/frontdeskai
+```
+
+When the pod is ready, **start a new chat** and ask the same question again.
+
+**What to observe:**
+
+- **Two tools, one request.** The audit trail shows `convert_expense_currency` first, then
+  `submit_expense_claim`. The new tool feeds a tool that was already there, and nobody changed the Finance
+  prompt.
+- **The rate for the right day.** 12 Sep 2026 was a Saturday, and the ECB publishes no rate at weekends. The
+  tool uses Friday's rate and says so.
+- **A claim you can check.** The claim description carries the original amount and the rate. Ask
+  `what is the status of <claim id>?` to read it back.
+- **Scoping again.** The skill declares only `finance`. Ask IT support `what is 84 EUR in rupees?` and the
+  tool is not there.
 
 ---
 
