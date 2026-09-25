@@ -592,8 +592,8 @@ OCI API private key is set through conversation and stored encrypted — no Kube
 ## Part 9 — Reaching Outside: MCP
 
 Already deployed if you ran `scripts/quickstart.sh`; otherwise `bash scripts/deploy-mcp.sh` (PostgreSQL +
-MCP Leave Server in the `postgres` namespace). **Not available in a workshop namespace**, which cannot
-create the `postgres` namespace. There, read this part rather than run it.
+MCP Leave Server in the `postgres` namespace). In a workshop namespace, `deploy-spark.sh` deploys both
+into **your own** namespace instead, and the app reaches the server at `http://mcp-leave:8001/mcp`.
 
 The MCP server has its **own** employee roster, separate from the app's SQLite. Log in as
 `alice@unigps.in` and ask:
@@ -602,10 +602,11 @@ The MCP server has its **own** employee roster, separate from the app's SQLite. 
 How many leaves do I have left?
 ```
 
-**What to observe:** the answer (casual 8, sick 4, earned 12, WFH 18) comes from PostgreSQL in another
-namespace, reached over the Model Context Protocol — not from the local database that answered the same
+**What to observe:** the answer (casual 8, sick 4, earned 12, WFH 18) comes from PostgreSQL behind a
+separate MCP server, reached over the Model Context Protocol — not from the local database that answered the same
 question in Part 4. The HR worker calls `get_leave_balance_from_hr_system`, which POSTs a JSON-RPC
-request to `http://mcp-leave.postgres.svc.cluster.local:8001/mcp`.
+request to `http://mcp-leave.postgres.svc.cluster.local:8001/mcp` (`http://mcp-leave:8001/mcp` in a
+workshop namespace).
 
 Other MCP-backed identities: `bob` (HR, pending wedding leave), `carol` (Finance), `dave` (DevOps, one
 rejected holiday request). Ask `how much leave have I used this year?` as `alice` — she has approved
@@ -637,7 +638,7 @@ flowchart TD
 **What to observe in the audit trail:** `Hr worker: escalating` → `Escalation check: True` → two
 `Manager called tool` entries, the first reading the balance and the second returning
 `Leave approved. Reference #N`. The reply quotes the reference number and the remaining balance. Confirm
-the row exists in the other namespace:
+the row exists in PostgreSQL (in a workshop namespace, use `-n $APP_NAMESPACE` instead of `-n postgres`):
 
 ```bash
 kubectl -n postgres exec deploy/postgres -- \

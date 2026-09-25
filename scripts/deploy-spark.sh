@@ -122,6 +122,15 @@ else
   # a working configuration.
 fi
 
+# ── MCP Leave Service: PostgreSQL + MCP server, in this namespace ─────────────
+# Applied before the app so leave questions work from its first request.
+echo "==> Deploying the MCP Leave Service (PostgreSQL + MCP server)"
+sed -e '/^  namespace: postgres$/d' "${REPO_DIR}/mcp/postgre/configmap-init.yaml" \
+  | kubectl -n "${NAMESPACE}" apply -f -
+kubectl -n "${NAMESPACE}" apply -f "${MANIFESTS}/mcp-leave.yaml"
+kubectl -n "${NAMESPACE}" rollout status deployment/postgres --timeout=180s
+kubectl -n "${NAMESPACE}" rollout status deployment/mcp-leave --timeout=180s
+
 # ── Manifests ────────────────────────────────────────────────────────────────
 echo "==> Applying manifests"
 sed -e "s|SERVICE_NAME_PLACEHOLDER|${OTEL_SERVICE_NAME}|" \
@@ -145,4 +154,5 @@ echo "==> FrontDesk AI deployed."
 echo "    URL:    https://${APP_HOST}"
 echo "    Login:  rajesh.kumar@unigps.in / ${AUTH_PASSWORD}"
 echo "    Logs:   kubectl -n ${NAMESPACE} logs -f deploy/frontdeskai"
+echo "    MCP:    http://mcp-leave:8001/mcp (PostgreSQL: kubectl -n ${NAMESPACE} exec deploy/postgres -- psql -U hruser hrdb)"
 echo "    Traces: Grafana -> Explore -> Tempo -> service.name = ${OTEL_SERVICE_NAME}"

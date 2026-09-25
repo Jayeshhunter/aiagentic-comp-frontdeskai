@@ -1,0 +1,179 @@
+# MCP Leave Service for a participant namespace on the Spark cluster: PostgreSQL
+# (the "HR system of record") plus the MCP Leave Server in front of it.
+#
+# The kind path (mcp/, scripts/deploy-mcp.sh) puts both in a shared `postgres`
+# namespace. A participant cannot create namespaces, so here they sit next to the
+# app and the app reaches them at http://mcp-leave:8001/mcp.
+#
+# The init SQL is not repeated here: deploy-spark.sh applies
+# mcp/postgre/configmap-init.yaml with its namespace line stripped.
+#
+# Both Deployments use Recreate. The ResourceQuota allows 2Gi of limits.memory and
+# the app takes 1Gi, so a rolling surge can be quota-denied and hang the rollout.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  labels:
+    app: postgres
+type: Opaque
+stringData:
+  POSTGRES_USER: hruser
+  POSTGRES_PASSWORD: hrpassword
+  POSTGRES_DB: hrdb
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "hruser", "-d", "hrdb"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-leave
+  labels:
+    app: mcp-leave
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mcp-leave
+  template:
+    metadata:
+      labels:
+        app: mcp-leave
+    spec:
+      containers:
+        - name: mcp-leave
+          # Multi-arch (amd64 + arm64), built from mcp/mcp-postgre/.
+          image: brainupgrade/mcp-leave:1.0.0
+          ports:
+            - containerPort: 8001
+          env:
+            - name: PG_HOST
+              value: "postgres"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: MCP_PORT
+              value: "8001"
+          readinessProbe:
+            tcpSocket:
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-leave
+  labels:
+    app: mcp-leave
+spec:
+  type: ClusterIP
+  selector:
+    app: mcp-leave
+  ports:
+    - name: mcp-http
+      port: 8001
+      targetPort: 8001
