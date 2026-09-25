@@ -122,14 +122,12 @@ else
   # a working configuration.
 fi
 
-# ── MCP Leave Service: PostgreSQL + MCP server, in this namespace ─────────────
-# Applied before the app so leave questions work from its first request.
-echo "==> Deploying the MCP Leave Service (PostgreSQL + MCP server)"
-sed -e '/^  namespace: postgres$/d' "${REPO_DIR}/mcp/postgre/configmap-init.yaml" \
-  | kubectl -n "${NAMESPACE}" apply -f -
-kubectl -n "${NAMESPACE}" apply -f "${MANIFESTS}/mcp-leave.yaml"
-kubectl -n "${NAMESPACE}" rollout status deployment/postgres --timeout=180s
-kubectl -n "${NAMESPACE}" rollout status deployment/mcp-leave --timeout=180s
+# ── MCP Leave Service: one shared copy for the whole cluster ─────────────────
+# PostgreSQL + the MCP Leave Server run once, in namespace `postgres`, set up by
+# the trainer. A copy per namespace pushed the single node past its pod limit.
+# The app reaches it at MCP_LEAVE_URL in the ConfigMap. Leave data is shared by
+# everyone in the cohort.
+echo "==> MCP Leave Service: shared, at http://mcp-leave.postgres.svc.cluster.local:8001/mcp"
 
 # ── Manifests ────────────────────────────────────────────────────────────────
 echo "==> Applying manifests"
@@ -154,5 +152,5 @@ echo "==> FrontDesk AI deployed."
 echo "    URL:    https://${APP_HOST}"
 echo "    Login:  rajesh.kumar@unigps.in / ${AUTH_PASSWORD}"
 echo "    Logs:   kubectl -n ${NAMESPACE} logs -f deploy/frontdeskai"
-echo "    MCP:    http://mcp-leave:8001/mcp (PostgreSQL: kubectl -n ${NAMESPACE} exec deploy/postgres -- psql -U hruser hrdb)"
+echo "    MCP:    http://mcp-leave.postgres.svc.cluster.local:8001/mcp (shared by the cohort)"
 echo "    Traces: Grafana -> Explore -> Tempo -> service.name = ${OTEL_SERVICE_NAME}"

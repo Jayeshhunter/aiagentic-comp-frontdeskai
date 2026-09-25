@@ -41,10 +41,9 @@ data:
   # 30 namespaces at once. Keep it baked in.
   SQLITE_DIR: "/shared/.sqlite"
 
-  # MCP Leave Server, deployed into this same namespace by deploy-spark.sh. The
-  # app's built-in default points at the kind layout's `postgres` namespace,
-  # which does not exist here.
-  MCP_LEAVE_URL: "http://mcp-leave:8001/mcp"
+  # The one MCP Leave Server for the cluster, in namespace `postgres` (the same
+  # layout as kind). Shared by every participant.
+  MCP_LEAVE_URL: "http://mcp-leave.postgres.svc.cluster.local:8001/mcp"
 
   # Fails closed if SECRET_KEY is missing rather than minting a throwaway one.
   ENV: "production"

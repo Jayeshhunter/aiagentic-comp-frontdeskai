@@ -620,8 +620,8 @@ When the pod is ready, **start a new chat** and ask the same question again.
 ## Part 9 — Reaching Outside: MCP
 
 Already deployed if you ran `scripts/quickstart.sh`; otherwise `bash scripts/deploy-mcp.sh` (PostgreSQL +
-MCP Leave Server in the `postgres` namespace). In a workshop namespace, `deploy-spark.sh` deploys both
-into **your own** namespace instead, and the app reaches the server at `http://mcp-leave:8001/mcp`.
+MCP Leave Server in the `postgres` namespace). In the workshop, one shared copy runs in the `postgres`
+namespace for the whole cohort, so leave data is shared: another participant's approvals show up too.
 
 The MCP server has its **own** employee roster, separate from the app's SQLite. Log in as
 `alice@unigps.in` and ask:
@@ -633,8 +633,7 @@ How many leaves do I have left?
 **What to observe:** the answer (casual 8, sick 4, earned 12, WFH 18) comes from PostgreSQL behind a
 separate MCP server, reached over the Model Context Protocol — not from the local database that answered the same
 question in Part 4. The HR worker calls `get_leave_balance_from_hr_system`, which POSTs a JSON-RPC
-request to `http://mcp-leave.postgres.svc.cluster.local:8001/mcp` (`http://mcp-leave:8001/mcp` in a
-workshop namespace).
+request to `http://mcp-leave.postgres.svc.cluster.local:8001/mcp`.
 
 Other MCP-backed identities: `bob` (HR, pending wedding leave), `carol` (Finance), `dave` (DevOps, one
 rejected holiday request). Ask `how much leave have I used this year?` as `alice` — she has approved
@@ -667,7 +666,7 @@ flowchart TD
 **What to observe in the audit trail:** `Hr worker: escalating` → `Escalation check: True` → two
 `Manager called tool` entries, the first reading the balance and the second returning
 `Leave approved. Reference #N`. The reply quotes the reference number and the remaining balance. Confirm
-the row exists in PostgreSQL (in a workshop namespace, use `-n $APP_NAMESPACE` instead of `-n postgres`):
+the row exists in PostgreSQL (in the workshop you cannot reach the shared `postgres` namespace, so skip this):
 
 ```bash
 kubectl -n postgres exec deploy/postgres -- \

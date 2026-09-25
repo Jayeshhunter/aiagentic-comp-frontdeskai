@@ -68,9 +68,9 @@ data is on the PVC and survives.
 
 ### What is different from a Codespace or laptop
 
-- **The MCP Leave Service (Part 9 of the tour) runs in your own namespace.** `deploy-spark.sh` deploys
-  PostgreSQL and the MCP Leave Server next to the app, so the app reaches it at `http://mcp-leave:8001/mcp`
-  instead of the `postgres` namespace a laptop or Codespace uses.
+- **The MCP Leave Service (Part 9 of the tour) is shared by the cohort.** One PostgreSQL + MCP Leave Server
+  runs in the `postgres` namespace for everyone, so leave balances and approvals are shared.
+  `deploy-spark.sh` deploys only the app.
 - **No Grafana install.** Traces go to the shared Tempo as service `frontdeskai-<your namespace>`: in
   Grafana, open *Explore → Tempo → service.name*.
 - **Only the workshop models.** To switch models from admin chat (Part 7), use a model your key can reach:
